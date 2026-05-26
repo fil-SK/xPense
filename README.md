@@ -2,6 +2,10 @@
 
 Personalna web aplikacija za praćenje i planiranje ličnih finansija. Izgrađena u Reactu, podaci se čuvaju lokalno u browseru (localStorage) — bez servera, bez naloga, bez oblaka.
 
+Aplikacija je razvijena za lične potrebe, radi planiranja budžeta i praćenja mesečnih troškova.
+
+Realizovana uz pomoć Claude AI-ja.
+
 ---
 
 ## Funkcionalnosti
@@ -27,7 +31,7 @@ Personalna web aplikacija za praćenje i planiranje ličnih finansija. Izgrađen
 ### Budžet
 - Godišnji plan prihoda i rashoda u formatu tabele (12 meseci × N stavki)
 - Fiksni redovi: **Plata** i **Bonus / Ostalo** (prihodi)
-- Dinamički redovi: korisnik dodaje/uklanja fondove po želji; dvoklikom na naziv — preimenovanje
+- Dinamički redovi: korisnik dodaje/uklanja fondove po želji; dvoklikom na naziv — preimenovanje; prevlačenjem ⠿ ikone — promena redosleda
 - Inline uređivanje svake ćelije — klik za unos, Enter ili klik van ćelije za čuvanje
 - Auto-računanje **bilansa** po mesecu i za celu godinu (zeleno = plus, crveno = minus)
 - Tekući mesec je vizuelno istaknut kolonom

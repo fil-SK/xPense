@@ -1,4 +1,18 @@
 import { useState, useRef, useEffect } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useApp } from '../App.jsx';
 import { exportBudget, importBudget } from '../utils/storage.js';
 
@@ -15,7 +29,7 @@ function rowTotal(arr) {
   return arr.reduce((s, v) => s + (v ?? 0), 0);
 }
 
-function BudgetCell({ value, onSave, dimmed }) {
+function BudgetCell({ value, onSave }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const inputRef = useRef(null);
@@ -56,7 +70,7 @@ function BudgetCell({ value, onSave, dimmed }) {
 
   return (
     <span
-      className={`bgc ${value != null ? 'bgc--filled' : 'bgc--empty'} ${dimmed ? 'bgc--dimmed' : ''}`}
+      className={`bgc ${value != null ? 'bgc--filled' : 'bgc--empty'}`}
       onClick={startEdit}
     >
       {fmt(value)}
@@ -64,9 +78,86 @@ function BudgetCell({ value, onSave, dimmed }) {
   );
 }
 
+function SortableFundRow({
+  fund, cols, currentMonth, confirmDelete,
+  onSave, onDelete, onStartRename, onRename, onRenameCancel,
+  editingFundId, editingFundName, setEditingFundName,
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: fund.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
+
+  const total = rowTotal(fund.amounts);
+
+  return (
+    <tr ref={setNodeRef} style={style} className="bg__row bg__row--fund">
+      <td className="bg__label-col bg__row-label bg__row-label--fund">
+        <span
+          className="bg__drag-handle"
+          {...attributes}
+          {...listeners}
+          title="Prevuci da promenjaš redosled"
+        >
+          ⠿
+        </span>
+
+        {editingFundId === fund.id ? (
+          <input
+            className="bg__fund-name-input"
+            value={editingFundName}
+            autoFocus
+            onChange={(e) => setEditingFundName(e.target.value)}
+            onBlur={() => onRename(fund.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onRename(fund.id);
+              if (e.key === 'Escape') onRenameCancel();
+            }}
+          />
+        ) : (
+          <span
+            className="bg__fund-name"
+            onDoubleClick={() => onStartRename(fund.id, fund.name)}
+            title="Dvoklikom preimenuj"
+          >
+            {fund.name}
+          </span>
+        )}
+
+        <button
+          className={`bg__del-btn ${confirmDelete === fund.id ? 'bg__del-btn--confirm' : ''}`}
+          onClick={() => onDelete(fund.id)}
+          title={confirmDelete === fund.id ? 'Klikni ponovo za potvrdu' : 'Obriši red'}
+        >
+          {confirmDelete === fund.id ? '⚠' : '×'}
+        </button>
+      </td>
+
+      {cols.map((m) => (
+        <td key={m} className={`bg__cell ${m === currentMonth ? 'bg__col--current' : ''}`}>
+          <BudgetCell
+            value={fund.amounts[m]}
+            onSave={(v) => onSave(fund.id, m, v)}
+          />
+        </td>
+      ))}
+
+      <td className="bg__total-cell">{fmt(total)}</td>
+    </tr>
+  );
+}
+
 export default function BudgetView() {
-  const { data, updateBudgetIncome, updateBudgetFund, addBudgetFund, removeBudgetFund, renameBudgetFund, importBudgetData, showToast } =
-    useApp();
+  const {
+    data, updateBudgetIncome, updateBudgetFund, addBudgetFund,
+    removeBudgetFund, renameBudgetFund, reorderBudgetFunds,
+    importBudgetData, showToast,
+  } = useApp();
+
   const year = new Date().getFullYear();
   const currentMonth = new Date().getMonth();
 
@@ -81,6 +172,10 @@ export default function BudgetView() {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const addInputRef = useRef(null);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
   const inPerMonth = Array.from({ length: 12 }, (_, i) =>
     (yb.income.plata[i] ?? 0) + (yb.income.bonus[i] ?? 0)
   );
@@ -91,7 +186,6 @@ export default function BudgetView() {
   const totalIn = inPerMonth.reduce((s, v) => s + v, 0);
   const totalOut = outPerMonth.reduce((s, v) => s + v, 0);
   const totalBalance = totalIn - totalOut;
-
   const hasAnyIn = yb.income.plata.some((v) => v != null) || yb.income.bonus.some((v) => v != null);
   const hasAnyOut = yb.funds.some((f) => f.amounts.some((v) => v != null));
 
@@ -113,13 +207,35 @@ export default function BudgetView() {
     }
   }
 
+  function handleStartRename(fundId, name) {
+    setEditingFundId(fundId);
+    setEditingFundName(name);
+  }
+
+  function handleRename(fundId) {
+    if (editingFundName.trim()) renameBudgetFund(year, fundId, editingFundName.trim());
+    setEditingFundId(null);
+  }
+
+  function handleDragEnd(event) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const ids = yb.funds.map((f) => f.id);
+    const oldIndex = ids.indexOf(active.id);
+    const newIndex = ids.indexOf(over.id);
+    reorderBudgetFunds(year, arrayMove(ids, oldIndex, newIndex));
+  }
+
   const cols = Array.from({ length: 12 }, (_, i) => i);
+  const fundIds = yb.funds.map((f) => f.id);
 
   return (
     <div className="budget">
       <div className="budget__head">
         <div className="budget__title">Budžet {year}</div>
-        <div className="budget__hint">Kliknite na ćeliju da unesete vrednost · Dvoklikom na naziv fonda ga preimenujete</div>
+        <div className="budget__hint">
+          Kliknite na ćeliju da unesete vrednost · Dvoklikom na naziv fonda ga preimenujete · Prevucite ⠿ da promenite redosled
+        </div>
         <div className="budget__tools">
           <button className="btn btn--ghost btn--sm" onClick={() => exportBudget(data.budget, year)}>
             ⬇ Izvezi budžet
@@ -149,10 +265,7 @@ export default function BudgetView() {
             <tr>
               <th className="bg__th bg__label-col">Stavka</th>
               {cols.map((m) => (
-                <th
-                  key={m}
-                  className={`bg__th bg__month-head ${m === currentMonth ? 'bg__col--current' : ''}`}
-                >
+                <th key={m} className={`bg__th bg__month-head ${m === currentMonth ? 'bg__col--current' : ''}`}>
                   {MONTHS_SHORT[m]}
                 </th>
               ))}
@@ -177,10 +290,7 @@ export default function BudgetView() {
                   <td className="bg__label-col bg__row-label">{label}</td>
                   {cols.map((m) => (
                     <td key={m} className={`bg__cell ${m === currentMonth ? 'bg__col--current' : ''}`}>
-                      <BudgetCell
-                        value={amounts[m]}
-                        onSave={(v) => updateBudgetIncome(year, field, m, v)}
-                      />
+                      <BudgetCell value={amounts[m]} onSave={(v) => updateBudgetIncome(year, field, m, v)} />
                     </td>
                   ))}
                   <td className="bg__total-cell">{fmt(total)}</td>
@@ -188,7 +298,6 @@ export default function BudgetView() {
               );
             })}
 
-            {/* Subtotal in */}
             <tr className="bg__subtotal-row">
               <td className="bg__label-col bg__row-label bg__row-label--sub">Ukupno prihodi</td>
               {cols.map((m) => (
@@ -204,61 +313,27 @@ export default function BudgetView() {
               <td colSpan={14} className="bg__section-label">RASHODI / FONDOVI</td>
             </tr>
 
-            {yb.funds.map((fund) => {
-              const total = rowTotal(fund.amounts);
-              return (
-                <tr key={fund.id} className="bg__row bg__row--fund">
-                  <td className="bg__label-col bg__row-label bg__row-label--fund">
-                    {editingFundId === fund.id ? (
-                      <input
-                        className="bg__fund-name-input"
-                        value={editingFundName}
-                        autoFocus
-                        onChange={(e) => setEditingFundName(e.target.value)}
-                        onBlur={() => {
-                          if (editingFundName.trim()) renameBudgetFund(year, fund.id, editingFundName.trim());
-                          setEditingFundId(null);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            if (editingFundName.trim()) renameBudgetFund(year, fund.id, editingFundName.trim());
-                            setEditingFundId(null);
-                          }
-                          if (e.key === 'Escape') setEditingFundId(null);
-                        }}
-                      />
-                    ) : (
-                      <span
-                        className="bg__fund-name"
-                        onDoubleClick={() => {
-                          setEditingFundId(fund.id);
-                          setEditingFundName(fund.name);
-                        }}
-                        title="Dvoklikom preimenuj"
-                      >
-                        {fund.name}
-                      </span>
-                    )}
-                    <button
-                      className={`bg__del-btn ${confirmDelete === fund.id ? 'bg__del-btn--confirm' : ''}`}
-                      onClick={() => handleDeleteFund(fund.id)}
-                      title={confirmDelete === fund.id ? 'Klikni ponovo za potvrdu' : 'Obriši red'}
-                    >
-                      {confirmDelete === fund.id ? '⚠' : '×'}
-                    </button>
-                  </td>
-                  {cols.map((m) => (
-                    <td key={m} className={`bg__cell ${m === currentMonth ? 'bg__col--current' : ''}`}>
-                      <BudgetCell
-                        value={fund.amounts[m]}
-                        onSave={(v) => updateBudgetFund(year, fund.id, m, v)}
-                      />
-                    </td>
-                  ))}
-                  <td className="bg__total-cell">{fmt(total)}</td>
-                </tr>
-              );
-            })}
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={fundIds} strategy={verticalListSortingStrategy}>
+                {yb.funds.map((fund) => (
+                  <SortableFundRow
+                    key={fund.id}
+                    fund={fund}
+                    cols={cols}
+                    currentMonth={currentMonth}
+                    confirmDelete={confirmDelete}
+                    onSave={(fundId, m, v) => updateBudgetFund(year, fundId, m, v)}
+                    onDelete={handleDeleteFund}
+                    onStartRename={handleStartRename}
+                    onRename={handleRename}
+                    onRenameCancel={() => setEditingFundId(null)}
+                    editingFundId={editingFundId}
+                    editingFundName={editingFundName}
+                    setEditingFundName={setEditingFundName}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
 
             {/* Add fund row */}
             <tr className="bg__add-row">
@@ -272,14 +347,11 @@ export default function BudgetView() {
                   onKeyDown={(e) => e.key === 'Enter' && handleAddFund()}
                 />
                 {newFundName.trim() && (
-                  <button className="btn btn--primary btn--sm" onClick={handleAddFund}>
-                    Dodaj
-                  </button>
+                  <button className="btn btn--primary btn--sm" onClick={handleAddFund}>Dodaj</button>
                 )}
               </td>
             </tr>
 
-            {/* Subtotal out */}
             {yb.funds.length > 0 && (
               <tr className="bg__subtotal-row">
                 <td className="bg__label-col bg__row-label bg__row-label--sub">Ukupno rashodi</td>
@@ -312,9 +384,7 @@ export default function BudgetView() {
               <td
                 className={`bg__total-cell bg__total-cell--strong bg__balance-total ${
                   hasAnyIn || hasAnyOut
-                    ? totalBalance >= 0
-                      ? 'bg__balance-cell--pos'
-                      : 'bg__balance-cell--neg'
+                    ? totalBalance >= 0 ? 'bg__balance-cell--pos' : 'bg__balance-cell--neg'
                     : ''
                 }`}
               >

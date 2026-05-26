@@ -721,6 +721,21 @@ thead .bg__col--current { background: #e0e7ff !important; }
 }
 
 /* Fund label */
+.bg__drag-handle {
+  opacity: 0;
+  cursor: grab;
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 0 4px 0 0;
+  flex-shrink: 0;
+  line-height: 1;
+  transition: opacity .12s;
+  user-select: none;
+  touch-action: none;
+}
+.bg__drag-handle:active { cursor: grabbing; }
+.bg__row--fund:hover .bg__drag-handle { opacity: 1; }
+
 .bg__fund-name {
   flex: 1;
   cursor: default;

@@ -167,6 +167,15 @@ export default function App() {
     }));
   }, []);
 
+  const reorderBudgetFunds = useCallback((year, orderedIds) => {
+    setData((d) => {
+      const yb = getYearBudget(d, year);
+      const indexed = Object.fromEntries(yb.funds.map((f) => [f.id, f]));
+      const reordered = orderedIds.map((id) => indexed[id]).filter(Boolean);
+      return { ...d, budget: { ...d.budget, [year]: { ...yb, funds: reordered } } };
+    });
+  }, []);
+
   const renameBudgetFund = useCallback((year, fundId, name) => {
     setData((d) => {
       const yb = getYearBudget(d, year);
@@ -200,6 +209,7 @@ export default function App() {
     addBudgetFund,
     removeBudgetFund,
     renameBudgetFund,
+    reorderBudgetFunds,
     updateTrackingMap,
     darkMode,
     toggleDarkMode: () => setDarkMode((v) => !v),
