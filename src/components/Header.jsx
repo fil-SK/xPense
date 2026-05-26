@@ -23,6 +23,12 @@ export default function Header() {
             Budžet
           </button>
           <button
+            className={`header__btn ${view === 'tracking' ? 'header__btn--active' : ''}`}
+            onClick={() => navigateTo('tracking')}
+          >
+            Praćenje
+          </button>
+          <button
             className={`header__btn ${view === 'categories' ? 'header__btn--active' : ''}`}
             onClick={() => navigateTo('categories')}
           >

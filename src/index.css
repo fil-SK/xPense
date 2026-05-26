@@ -793,3 +793,139 @@ thead .bg__col--current { background: #e0e7ff !important; }
 .bg__balance-cell--pos { color: var(--success); }
 .bg__balance-cell--neg { color: var(--danger); }
 .bg__balance-total { font-weight: 800; font-size: 14px; }
+
+/* ── Tracking setup view ─────────────────────────────────────────────────── */
+.tracking-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-bottom: 40px;
+}
+.tracking-setup__head { display: flex; flex-direction: column; gap: 4px; }
+.tracking-setup__title { font-size: 22px; font-weight: 700; }
+.tracking-setup__hint { font-size: 12px; color: var(--text-muted); }
+
+.tracking-setup__funds { display: flex; flex-direction: column; gap: 14px; }
+
+.tracking-fund-card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  box-shadow: var(--sh-sm);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tracking-fund-card__name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+.tracking-fund-card__count {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: -4px;
+}
+.tracking-fund-card__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.tracking-pill__check { font-size: 11px; }
+
+.tracking-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 80px 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+.tracking-empty__icon { font-size: 40px; }
+.tracking-empty__title { font-size: 18px; font-weight: 600; color: var(--text); }
+.tracking-empty__sub { font-size: 14px; max-width: 360px; line-height: 1.6; }
+
+/* ── Budget panel in MonthView ───────────────────────────────────────────── */
+.bp {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.bp__label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .7px;
+  color: var(--text-muted);
+}
+.bp__cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.bp-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--sh-sm);
+  padding: 12px 14px;
+  min-width: 160px;
+  flex: 1 1 160px;
+  max-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border-left: 3px solid transparent;
+}
+.bp-card--ok   { border-left-color: var(--success); }
+.bp-card--warn { border-left-color: var(--warning); }
+.bp-card--over { border-left-color: var(--danger); }
+.bp-card--unset { border-left-color: var(--border); }
+
+.bp-card__name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bp-card__unset {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+.bp-card__amounts {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.bp-card__spent { font-weight: 600; color: var(--text); }
+
+.bp-card__bar-wrap {
+  height: 4px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.bp-card__bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width .3s ease;
+}
+.bp-card--ok   .bp-card__bar-fill { background: var(--success); }
+.bp-card--warn .bp-card__bar-fill { background: var(--warning); }
+.bp-card--over .bp-card__bar-fill { background: var(--danger); }
+
+.bp-card__remaining {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.bp-card--ok   .bp-card__remaining { color: var(--success); }
+.bp-card--warn .bp-card__remaining { color: var(--warning); }
+.bp-card--over .bp-card__remaining { color: var(--danger); }
+.bp-card--unset .bp-card__remaining { color: var(--text-muted); }

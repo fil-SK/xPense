@@ -27,17 +27,27 @@ Personalna web aplikacija za praćenje i planiranje ličnih finansija. Izgrađen
 ### Budžet
 - Godišnji plan prihoda i rashoda u formatu tabele (12 meseci × N stavki)
 - Fiksni redovi: **Plata** i **Bonus / Ostalo** (prihodi)
-- Dinamički redovi: korisnik dodaje/uklanja fondove/kategorije rashoda po želji
+- Dinamički redovi: korisnik dodaje/uklanja fondove po želji; dvoklikom na naziv — preimenovanje
 - Inline uređivanje svake ćelije — klik za unos, Enter ili klik van ćelije za čuvanje
-- Dvoklikom na naziv fonda — preimenovanje
 - Auto-računanje **bilansa** po mesecu i za celu godinu (zeleno = plus, crveno = minus)
 - Tekući mesec je vizuelno istaknut kolonom
+- Uvoz i izvoz budžeta kao poseban JSON fajl (`budget-YYYY.json`)
+
+### Praćenje budžeta uživo
+- Na tabu **Praćenje** svaki budžetski fond se povezuje sa jednom ili više kategorija troškova (pill dugmad, automatsko čuvanje)
+- U pregledu svakog meseca (iznad pretrage) prikazuje se panel sa statusom svakog fonda:
+  - **Zeleno** — potrošeno < 90% od budžeta
+  - **Narandžasto** — potrošeno između 90% i 100%
+  - **Crveno** — prekoračen budžet, prikazuje se minus iznos
+  - **Sivo** — iznos za taj mesec nije unet u budžetu (`nije postavljeno`)
+- Tanka progress traka vizualno prikazuje iskorišćenost budžeta
+- Panel se ne prikazuje ako nije podešeno nijedno praćenje
 
 ### Uvoz i izvoz
-- **Izvezi JSON** — preuzimanje kompletnih podataka (troškovi + kategorije + budžet) u JSON fajl, pogodno za analizu u Claude AI
-- **Uvezi JSON** — učitavanje prethodno izvezenih podataka
+- **Izvezi JSON** — preuzimanje kompletnih podataka (troškovi + kategorije + budžet + podešavanja praćenja) u jedan JSON fajl, pogodno za analizu u Claude AI
+- **Uvezi JSON** — učitavanje prethodno izvezenih podataka; obnavlja sve uključujući podešavanja praćenja — dovoljan je jedan fajl nakon brisanja browsera
 - **Izvezi budžet** — izvoz samo budžet podataka u poseban fajl (`budget-YYYY.json`)
-- **Uvezi budžet** — učitavanje budžeta iz fajla; spaja po godini (ne briše postojeće podatke)
+- **Uvezi budžet** — učitavanje budžeta iz fajla; spaja po godini, ne briše postojeće podatke
 
 ---
 
@@ -74,6 +84,7 @@ Generiše produkcijski build u `dist/` folderu.
 ```
 src/
 ├── components/
+│   ├── BudgetPanel.jsx      # Panel za praćenje budžeta unutar prikaza meseca
 │   ├── BudgetView.jsx       # Godišnji budžet — tabela prihoda i rashoda
 │   ├── CategoryManager.jsx  # Upravljanje kategorijama
 │   ├── Charts.jsx           # Pita i bar grafici
@@ -82,7 +93,8 @@ src/
 │   ├── Header.jsx           # Navigacija
 │   ├── Home.jsx             # Početna strana
 │   ├── MonthView.jsx        # Pregled troškova za mesec
-│   └── PreviousSpendings.jsx# Navigacija po prethodnim mesecima
+│   ├── PreviousSpendings.jsx# Navigacija po prethodnim mesecima
+│   └── TrackingSetup.jsx    # Podešavanje praćenja budžeta po fondovima
 ├── utils/
 │   ├── helpers.js           # Formatiranje, filtriranje, konstante
 │   └── storage.js           # localStorage, uvoz/izvoz JSON

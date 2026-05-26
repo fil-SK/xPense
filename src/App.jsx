@@ -6,6 +6,7 @@ import MonthView from './components/MonthView.jsx';
 import PreviousSpendings from './components/PreviousSpendings.jsx';
 import CategoryManager from './components/CategoryManager.jsx';
 import BudgetView from './components/BudgetView.jsx';
+import TrackingSetup from './components/TrackingSetup.jsx';
 
 const AppContext = createContext(null);
 export const useApp = () => useContext(AppContext);
@@ -143,6 +144,16 @@ export default function App() {
     });
   }, []);
 
+  const updateTrackingMap = useCallback((year, fundId, categories) => {
+    setData((d) => ({
+      ...d,
+      trackingMaps: {
+        ...d.trackingMaps,
+        [year]: { ...(d.trackingMaps[year] ?? {}), [fundId]: categories },
+      },
+    }));
+  }, []);
+
   const renameBudgetFund = useCallback((year, fundId, name) => {
     setData((d) => {
       const yb = getYearBudget(d, year);
@@ -176,6 +187,7 @@ export default function App() {
     addBudgetFund,
     removeBudgetFund,
     renameBudgetFund,
+    updateTrackingMap,
   };
 
   return (
@@ -197,6 +209,7 @@ export default function App() {
           )}
           {view === 'categories' && <CategoryManager />}
           {view === 'budget' && <BudgetView />}
+          {view === 'tracking' && <TrackingSetup />}
         </main>
 
         {toast && (

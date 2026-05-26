@@ -16,15 +16,16 @@ const DEFAULT_CATEGORIES = [
 export function loadData() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { expenses: [], categories: [...DEFAULT_CATEGORIES], budget: {} };
+    if (!raw) return { expenses: [], categories: [...DEFAULT_CATEGORIES], budget: {}, trackingMaps: {} };
     const parsed = JSON.parse(raw);
     return {
       expenses: parsed.expenses ?? [],
       categories: parsed.categories ?? [...DEFAULT_CATEGORIES],
       budget: parsed.budget ?? {},
+      trackingMaps: parsed.trackingMaps ?? {},
     };
   } catch {
-    return { expenses: [], categories: [...DEFAULT_CATEGORIES], budget: {} };
+    return { expenses: [], categories: [...DEFAULT_CATEGORIES], budget: {}, trackingMaps: {} };
   }
 }
 
@@ -57,6 +58,7 @@ export function importJSON(file) {
           expenses: parsed.expenses,
           categories: parsed.categories,
           budget: parsed.budget ?? {},
+          trackingMaps: parsed.trackingMaps ?? {},
         });
       } catch {
         reject(new Error('Neispravan JSON fajl.'));
