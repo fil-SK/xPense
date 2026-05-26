@@ -17,8 +17,21 @@ export default function App() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [toast, setToast] = useState(null);
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem('expense-tracker-theme') === 'dark';
+  });
 
   useEffect(() => { saveData(data); }, [data]);
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('expense-tracker-theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('expense-tracker-theme', 'light');
+    }
+  }, [darkMode]);
 
   const showToast = useCallback((msg, type = 'success') => {
     setToast({ msg, type });
@@ -188,6 +201,8 @@ export default function App() {
     removeBudgetFund,
     renameBudgetFund,
     updateTrackingMap,
+    darkMode,
+    toggleDarkMode: () => setDarkMode((v) => !v),
   };
 
   return (

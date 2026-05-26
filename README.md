@@ -43,6 +43,10 @@ Personalna web aplikacija za praćenje i planiranje ličnih finansija. Izgrađen
 - Tanka progress traka vizualno prikazuje iskorišćenost budžeta
 - Panel se ne prikazuje ako nije podešeno nijedno praćenje
 
+### Tamna tema
+- Dugme 🌙 / ☀️ u navigaciji trenutno menja temu
+- Podešavanje se čuva u browseru odvojeno od podataka o troškovima — ne briše se uvozom JSON fajla i preživljava osvežavanje stranice
+
 ### Uvoz i izvoz
 - **Izvezi JSON** — preuzimanje kompletnih podataka (troškovi + kategorije + budžet + podešavanja praćenja) u jedan JSON fajl, pogodno za analizu u Claude AI
 - **Uvezi JSON** — učitavanje prethodno izvezenih podataka; obnavlja sve uključujući podešavanja praćenja — dovoljan je jedan fajl nakon brisanja browsera

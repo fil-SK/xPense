@@ -1,7 +1,7 @@
 import { useApp } from '../App.jsx';
 
 export default function Header() {
-  const { view, navigateTo } = useApp();
+  const { view, navigateTo, darkMode, toggleDarkMode } = useApp();
 
   return (
     <header className="header">
@@ -10,6 +10,13 @@ export default function Header() {
           💸 <span>Tracker Troškova</span>
         </div>
         <nav className="header__nav">
+          <button
+            className="header__btn header__theme-btn"
+            onClick={toggleDarkMode}
+            title={darkMode ? 'Svetla tema' : 'Tamna tema'}
+          >
+            {darkMode ? '☀️' : '🌙'}
+          </button>
           <button
             className={`header__btn ${view === 'home' ? 'header__btn--active' : ''}`}
             onClick={() => navigateTo('home')}

@@ -929,3 +929,48 @@ thead .bg__col--current { background: #e0e7ff !important; }
 .bp-card--warn .bp-card__remaining { color: var(--warning); }
 .bp-card--over .bp-card__remaining { color: var(--danger); }
 .bp-card--unset .bp-card__remaining { color: var(--text-muted); }
+
+/* ── Dark mode ───────────────────────────────────────────────────────────── */
+html.dark {
+  --bg: #0f172a;
+  --bg-card: #1e293b;
+  --bg-hover: #334155;
+  --primary-light: #1e1b4b;
+  --primary-dark: #818cf8;
+  --text: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border: #334155;
+  --danger-light: #450a0a;
+  --success-light: #052e16;
+  --warning-light: #431407;
+  --sh-sm: 0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
+  --sh: 0 4px 12px rgba(0,0,0,.4), 0 2px 4px rgba(0,0,0,.3);
+  --sh-lg: 0 10px 24px rgba(0,0,0,.5), 0 4px 8px rgba(0,0,0,.3);
+}
+
+/* Budget grid: hardcoded column highlight colors */
+html.dark .bg__col--current { background: #1e1b4b !important; }
+html.dark thead .bg__col--current { background: #312e81 !important; }
+html.dark .bg__subtotal-row > td { background: #162032; }
+html.dark .bg__section-row td { background: #0f172a; }
+
+/* Inputs inside budget grid */
+html.dark .bgc-input,
+html.dark .bg__fund-name-input,
+html.dark .bg__add-input { background: #0f172a; color: var(--text); }
+html.dark .bg__add-input:focus { background: #1e293b; }
+html.dark .bgc:hover { background: #312e81; }
+
+/* Theme toggle button — slightly larger touch target */
+.header__theme-btn { font-size: 16px; padding: 6px 9px; }
+
+/* Recharts tooltips */
+html.dark .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Category manager inline input */
+html.dark input[type="text"] { color-scheme: dark; }
+html.dark select { color-scheme: dark; }
