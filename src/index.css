@@ -979,6 +979,18 @@ html.dark .bgc:hover { background: #312e81; }
 /* Theme toggle button — slightly larger touch target */
 .header__theme-btn { font-size: 16px; padding: 6px 9px; }
 
+/* Autosave status indicator */
+.header__autosave { font-size: 12px; border-radius: var(--radius-sm); }
+.header__autosave--none { color: var(--text-muted); border: 1px dashed var(--border) !important; }
+.header__autosave--none:hover { border-color: var(--primary) !important; }
+.header__autosave--prompt { color: var(--warning); border: 1px solid var(--warning) !important; }
+.header__autosave--prompt:hover { background: var(--warning-light) !important; color: var(--warning) !important; }
+.header__autosave--active { padding: 6px 9px; color: var(--success); cursor: default; }
+.header__autosave--error { color: var(--danger); border: 1px solid var(--danger) !important; }
+.header__autosave--error:hover { background: var(--danger-light) !important; color: var(--danger) !important; }
+html.dark .header__autosave--prompt:hover { background: #451a03 !important; }
+html.dark .header__autosave--error:hover { background: #450a0a !important; }
+
 /* Recharts tooltips */
 html.dark .recharts-tooltip-wrapper .recharts-default-tooltip {
   background: #1e293b !important;

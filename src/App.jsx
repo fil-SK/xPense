@@ -1,5 +1,9 @@
-import { useState, useEffect, useCallback, createContext, useContext } from 'react';
+import { useState, useEffect, useCallback, useRef, createContext, useContext } from 'react';
 import { loadData, saveData } from './utils/storage.js';
+import {
+  getStoredHandle, checkPermission, grantPermission,
+  readFromFile, writeToFile, pickFile,
+} from './utils/fileStorage.js';
 import Header from './components/Header.jsx';
 import Home from './components/Home.jsx';
 import MonthView from './components/MonthView.jsx';
@@ -20,8 +24,42 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem('expense-tracker-theme') === 'dark';
   });
+  const fileHandleRef = useRef(null);
+  const [autosaveStatus, setAutosaveStatus] = useState('none');
 
   useEffect(() => { saveData(data); }, [data]);
+
+  useEffect(() => {
+    if (!fileHandleRef.current || autosaveStatus !== 'active') return;
+    writeToFile(fileHandleRef.current, data).catch(() => setAutosaveStatus('error'));
+  }, [data, autosaveStatus]);
+
+  useEffect(() => {
+    async function init() {
+      const handle = await getStoredHandle();
+      if (!handle) return;
+      const perm = await checkPermission(handle);
+      if (perm === 'granted') {
+        fileHandleRef.current = handle;
+        try {
+          const fileData = await readFromFile(handle);
+          if (fileData && Array.isArray(fileData.expenses)) {
+            setData({
+              expenses: fileData.expenses ?? [],
+              categories: fileData.categories ?? [],
+              budget: fileData.budget ?? {},
+              trackingMaps: fileData.trackingMaps ?? {},
+            });
+          }
+        } catch { /* file is new/empty — will be written on next data change */ }
+        setAutosaveStatus('active');
+      } else {
+        fileHandleRef.current = handle;
+        setAutosaveStatus('prompt');
+      }
+    }
+    init();
+  }, []);
 
   useEffect(() => {
     if (darkMode) {
@@ -37,6 +75,31 @@ export default function App() {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 2800);
   }, []);
+
+  const setupAutosave = useCallback(async () => {
+    try {
+      const handle = await pickFile();
+      fileHandleRef.current = handle;
+      setAutosaveStatus('active');
+      showToast('Autosave podešen — podaci će se automatski čuvati.');
+    } catch (e) {
+      if (e.name !== 'AbortError') showToast('Greška pri podešavanju autosave.', 'danger');
+    }
+  }, [showToast]);
+
+  const activateAutosave = useCallback(async () => {
+    try {
+      const perm = await grantPermission(fileHandleRef.current);
+      if (perm === 'granted') {
+        setAutosaveStatus('active');
+        showToast('Autosave aktiviran.');
+      } else {
+        showToast('Dozvola odbijena.', 'danger');
+      }
+    } catch {
+      showToast('Greška pri aktivaciji autosave.', 'danger');
+    }
+  }, [showToast]);
 
   const navigateTo = useCallback((v, year, month) => {
     setView(v);
@@ -213,6 +276,9 @@ export default function App() {
     updateTrackingMap,
     darkMode,
     toggleDarkMode: () => setDarkMode((v) => !v),
+    autosaveStatus,
+    setupAutosave,
+    activateAutosave,
   };
 
   return (
