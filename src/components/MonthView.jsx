@@ -154,6 +154,12 @@ export default function MonthView({ year, month, isCurrent }) {
         </button>
       </div>
 
+      {showCharts && (
+        <div ref={chartsRef}>
+          <Charts expenses={allExpenses} year={year} month={month} />
+        </div>
+      )}
+
       <div className="expense-list">
         {filtered.length === 0 ? (
           <div className="expense-list__empty">
@@ -168,12 +174,6 @@ export default function MonthView({ year, month, isCurrent }) {
           filtered.map((e) => <ExpenseItem key={e.id} expense={e} />)
         )}
       </div>
-
-      {showCharts && (
-        <div ref={chartsRef}>
-          <Charts expenses={allExpenses} year={year} month={month} />
-        </div>
-      )}
 
       {adding && (
         <ExpenseModal

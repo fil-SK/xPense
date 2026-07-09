@@ -488,6 +488,7 @@ body {
   font-size: 14px;
   font-family: inherit;
   background: var(--bg-card);
+  color: var(--text);
   outline: none;
   transition: border-color .15s;
 }

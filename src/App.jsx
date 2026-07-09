@@ -41,17 +41,22 @@ export default function App() {
       const perm = await checkPermission(handle);
       if (perm === 'granted') {
         fileHandleRef.current = handle;
-        try {
-          const fileData = await readFromFile(handle);
-          if (fileData && Array.isArray(fileData.expenses)) {
-            setData({
-              expenses: fileData.expenses ?? [],
-              categories: fileData.categories ?? [],
-              budget: fileData.budget ?? {},
-              trackingMaps: fileData.trackingMaps ?? {},
-            });
-          }
-        } catch { /* file is new/empty — will be written on next data change */ }
+        // Only load from file when localStorage was wiped (recovery mode).
+        // Normally localStorage is the source of truth; file is the backup.
+        const localStorageMissing = localStorage.getItem('expense-tracker-v1') === null;
+        if (localStorageMissing) {
+          try {
+            const fileData = await readFromFile(handle);
+            if (fileData && Array.isArray(fileData.expenses)) {
+              setData({
+                expenses: fileData.expenses ?? [],
+                categories: fileData.categories ?? [],
+                budget: fileData.budget ?? {},
+                trackingMaps: fileData.trackingMaps ?? {},
+              });
+            }
+          } catch { }
+        }
         setAutosaveStatus('active');
       } else {
         fileHandleRef.current = handle;
