@@ -158,8 +158,9 @@ export default function BudgetView() {
     importBudgetData, showToast,
   } = useApp();
 
-  const year = new Date().getFullYear();
-  const currentMonth = new Date().getMonth();
+  const thisYear = new Date().getFullYear();
+  const [year, setYear] = useState(thisYear);
+  const currentMonth = year === thisYear ? new Date().getMonth() : -1;
 
   const yb = data.budget?.[year] ?? {
     income: { plata: Array(12).fill(null), bonus: Array(12).fill(null) },
@@ -232,7 +233,11 @@ export default function BudgetView() {
   return (
     <div className="budget">
       <div className="budget__head">
-        <div className="budget__title">Budžet {year}</div>
+        <div className="budget__title">
+          <button className="budget__year-nav" onClick={() => setYear((y) => y - 1)}>‹</button>
+          Budžet {year}
+          <button className="budget__year-nav" onClick={() => setYear((y) => y + 1)}>›</button>
+        </div>
         <div className="budget__hint">
           Kliknite na ćeliju da unesete vrednost · Dvoklikom na naziv fonda ga preimenujete · Prevucite ⠿ da promenite redosled
         </div>

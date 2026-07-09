@@ -551,7 +551,22 @@ body {
   font-size: 22px;
   font-weight: 700;
   color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
+.budget__year-nav {
+  background: none;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 10px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.budget__year-nav:hover { background: var(--primary-light); color: var(--primary); }
 .budget__hint {
   font-size: 12px;
   color: var(--text-muted);
