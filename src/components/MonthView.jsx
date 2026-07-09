@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../App.jsx';
 import {
   getExpensesForMonth, getTotalAmount, formatAmount,
@@ -36,6 +36,13 @@ export default function MonthView({ year, month, isCurrent }) {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('date-desc');
   const [showCharts, setShowCharts] = useState(false);
+  const chartsRef = useRef(null);
+
+  useEffect(() => {
+    if (showCharts && chartsRef.current) {
+      chartsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [showCharts]);
 
   const allExpenses = useMemo(
     () => getExpensesForMonth(data.expenses, year, month),
@@ -163,7 +170,9 @@ export default function MonthView({ year, month, isCurrent }) {
       </div>
 
       {showCharts && (
-        <Charts expenses={allExpenses} year={year} month={month} />
+        <div ref={chartsRef}>
+          <Charts expenses={allExpenses} year={year} month={month} />
+        </div>
       )}
 
       {adding && (
