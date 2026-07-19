@@ -15,6 +15,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useApp } from '../App.jsx';
 import { exportBudget, importBudget } from '../utils/storage.js';
+import { CHART_COLORS } from '../utils/helpers.js';
 
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun', 'Jul', 'Avg', 'Sep', 'Okt', 'Nov', 'Dec'];
 
@@ -82,6 +83,7 @@ function SortableFundRow({
   fund, cols, currentMonth, confirmDelete,
   onSave, onDelete, onStartRename, onRename, onRenameCancel,
   editingFundId, editingFundName, setEditingFundName,
+  expanded, onToggleExpand, categories, mapped, onToggleCat,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: fund.id });
@@ -95,59 +97,103 @@ function SortableFundRow({
   const total = rowTotal(fund.amounts);
 
   return (
-    <tr ref={setNodeRef} style={style} className="bg__row bg__row--fund">
-      <td className="bg__label-col bg__row-label bg__row-label--fund">
-        <span
-          className="bg__drag-handle"
-          {...attributes}
-          {...listeners}
-          title="Prevuci da promenjaš redosled"
-        >
-          ⠿
-        </span>
-
-        {editingFundId === fund.id ? (
-          <input
-            className="bg__fund-name-input"
-            value={editingFundName}
-            autoFocus
-            onChange={(e) => setEditingFundName(e.target.value)}
-            onBlur={() => onRename(fund.id)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') onRename(fund.id);
-              if (e.key === 'Escape') onRenameCancel();
-            }}
-          />
-        ) : (
+    <>
+      <tr ref={setNodeRef} style={style} className="bg__row bg__row--fund">
+        <td className="bg__label-col bg__row-label bg__row-label--fund">
           <span
-            className="bg__fund-name"
-            onDoubleClick={() => onStartRename(fund.id, fund.name)}
-            title="Dvoklikom preimenuj"
+            className="bg__drag-handle"
+            {...attributes}
+            {...listeners}
+            title="Prevuci da promenjaš redosled"
           >
-            {fund.name}
+            ⠿
           </span>
-        )}
 
-        <button
-          className={`bg__del-btn ${confirmDelete === fund.id ? 'bg__del-btn--confirm' : ''}`}
-          onClick={() => onDelete(fund.id)}
-          title={confirmDelete === fund.id ? 'Klikni ponovo za potvrdu' : 'Obriši red'}
-        >
-          {confirmDelete === fund.id ? '⚠' : '×'}
-        </button>
-      </td>
+          {editingFundId === fund.id ? (
+            <input
+              className="bg__fund-name-input"
+              value={editingFundName}
+              autoFocus
+              onChange={(e) => setEditingFundName(e.target.value)}
+              onBlur={() => onRename(fund.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') onRename(fund.id);
+                if (e.key === 'Escape') onRenameCancel();
+              }}
+            />
+          ) : (
+            <span
+              className="bg__fund-name"
+              onDoubleClick={() => onStartRename(fund.id, fund.name)}
+              title="Dvoklikom preimenuj"
+            >
+              {fund.name}
+            </span>
+          )}
 
-      {cols.map((m) => (
-        <td key={m} className={`bg__cell ${m === currentMonth ? 'bg__col--current' : ''}`}>
-          <BudgetCell
-            value={fund.amounts[m]}
-            onSave={(v) => onSave(fund.id, m, v)}
-          />
+          <button
+            className={`bg__cat-chip ${expanded ? 'bg__cat-chip--open' : ''}`}
+            onClick={onToggleExpand}
+            title={expanded ? 'Sakrij kategorije' : 'Kategorije troškova za ovaj fond'}
+          >
+            📂{mapped.length > 0 ? ` ${mapped.length}` : ''}
+          </button>
+
+          <button
+            className={`bg__del-btn ${confirmDelete === fund.id ? 'bg__del-btn--confirm' : ''}`}
+            onClick={() => onDelete(fund.id)}
+            title={confirmDelete === fund.id ? 'Klikni ponovo za potvrdu' : 'Obriši red'}
+          >
+            {confirmDelete === fund.id ? '⚠' : '×'}
+          </button>
         </td>
-      ))}
 
-      <td className="bg__total-cell">{fmt(total)}</td>
-    </tr>
+        {cols.map((m) => (
+          <td key={m} className={`bg__cell ${m === currentMonth ? 'bg__col--current' : ''}`}>
+            <BudgetCell
+              value={fund.amounts[m]}
+              onSave={(v) => onSave(fund.id, m, v)}
+            />
+          </td>
+        ))}
+
+        <td className="bg__total-cell">{fmt(total)}</td>
+      </tr>
+
+      {expanded && !isDragging && (
+        <tr className="bg__tracking-row">
+          <td colSpan={14} className="bg__tracking-cell">
+            <div className="bg__tracking-panel">
+              <span className="bg__tracking-label">
+                {categories.length === 0 ? 'Nema kategorija — dodaj ih u Kategorije.' : 'Kategorije:'}
+              </span>
+              <div className="bg__tracking-pills">
+                {categories.map((cat, i) => {
+                  const active = mapped.includes(cat);
+                  const color = CHART_COLORS[i % CHART_COLORS.length];
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      className="cat-pill tracking-pill"
+                      style={
+                        active
+                          ? { background: color, borderColor: color, color: '#fff' }
+                          : { background: color + '18', borderColor: color + '70', color }
+                      }
+                      onClick={() => onToggleCat(cat)}
+                    >
+                      {active && <span className="tracking-pill__check">✓ </span>}
+                      {cat}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
@@ -155,7 +201,7 @@ export default function BudgetView() {
   const {
     data, updateBudgetIncome, updateBudgetFund, addBudgetFund,
     removeBudgetFund, renameBudgetFund, reorderBudgetFunds,
-    copyBudgetToYear, importBudgetData, showToast,
+    copyBudgetToYear, importBudgetData, showToast, updateTrackingMap,
   } = useApp();
 
   const thisYear = new Date().getFullYear();
@@ -172,6 +218,7 @@ export default function BudgetView() {
   const [editingFundName, setEditingFundName] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [copyConfirm, setCopyConfirm] = useState(false);
+  const [expandedFundId, setExpandedFundId] = useState(null);
   const addInputRef = useRef(null);
 
   const sensors = useSensors(
@@ -258,7 +305,7 @@ export default function BudgetView() {
           <button className="budget__year-nav" onClick={() => setYear((y) => y + 1)}>›</button>
         </div>
         <div className="budget__hint">
-          Kliknite na ćeliju da unesete vrednost · Dvoklikom na naziv fonda ga preimenujete · Prevucite ⠿ da promenite redosled
+          Kliknite na ćeliju da unesete vrednost · Dvoklikom na naziv fonda ga preimenujete · 📂 za kategorije · Prevucite ⠿ za redosled
         </div>
         <div className="budget__tools">
           <button
@@ -346,23 +393,36 @@ export default function BudgetView() {
 
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={fundIds} strategy={verticalListSortingStrategy}>
-                {yb.funds.map((fund) => (
-                  <SortableFundRow
-                    key={fund.id}
-                    fund={fund}
-                    cols={cols}
-                    currentMonth={currentMonth}
-                    confirmDelete={confirmDelete}
-                    onSave={(fundId, m, v) => updateBudgetFund(year, fundId, m, v)}
-                    onDelete={handleDeleteFund}
-                    onStartRename={handleStartRename}
-                    onRename={handleRename}
-                    onRenameCancel={() => setEditingFundId(null)}
-                    editingFundId={editingFundId}
-                    editingFundName={editingFundName}
-                    setEditingFundName={setEditingFundName}
-                  />
-                ))}
+                {yb.funds.map((fund) => {
+                  const mapped = (data.trackingMaps?.[year] ?? {})[fund.id] ?? [];
+                  return (
+                    <SortableFundRow
+                      key={fund.id}
+                      fund={fund}
+                      cols={cols}
+                      currentMonth={currentMonth}
+                      confirmDelete={confirmDelete}
+                      onSave={(fundId, m, v) => updateBudgetFund(year, fundId, m, v)}
+                      onDelete={handleDeleteFund}
+                      onStartRename={handleStartRename}
+                      onRename={handleRename}
+                      onRenameCancel={() => setEditingFundId(null)}
+                      editingFundId={editingFundId}
+                      editingFundName={editingFundName}
+                      setEditingFundName={setEditingFundName}
+                      expanded={expandedFundId === fund.id}
+                      onToggleExpand={() => setExpandedFundId((id) => id === fund.id ? null : fund.id)}
+                      categories={data.categories}
+                      mapped={mapped}
+                      onToggleCat={(cat) => {
+                        const next = mapped.includes(cat)
+                          ? mapped.filter((c) => c !== cat)
+                          : [...mapped, cat];
+                        updateTrackingMap(year, fund.id, next);
+                      }}
+                    />
+                  );
+                })}
               </SortableContext>
             </DndContext>
 

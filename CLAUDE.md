@@ -24,14 +24,18 @@ Test files live in `src/__tests__/`. Setup file is `src/test/setup.js` (clears l
 
 **Test workflow:** For every new feature or edit, write tests in the relevant file(s) before reporting done, then run `npm test` to confirm nothing is broken. If a new pure utility is added, test it in the helpers or dataTransforms suite. If a new component is added, add a `.test.jsx` file for it.
 
-**Current test files:**
+**Current test files (127 tests, 11 files):**
 - `helpers.test.js` — all pure functions in `utils/helpers.js`
 - `storage.test.js` — `loadData`, `saveData`, `importJSON`, `importBudget`, `buildCSVString`
 - `dataTransforms.test.js` — `generateRecurringExpenses`, `applyBudgetCopy`
 - `GlobalSearch.test.jsx` — rendering, search filtering, navigation callbacks
 - `ExpenseModal.test.jsx` — add/edit/recurring flows, validation
-- `MonthView.test.jsx` — monthly note textarea (pre-fill, blur-save, no-op when unchanged)
+- `MonthView.test.jsx` — back navigation via prevView, monthly note textarea
 - `SavingsGoals.test.jsx` — empty state, add form, progress calculation, two-click delete
+- `Header.test.jsx` — Prethodne button render/active states, theme toggle
+- `Home.test.jsx` — quick-add circle button, modal open/close, removed Prethodne card
+- `BudgetPanel.test.jsx` — null render, fund rows, amounts, remaining, "nije postavljeno"
+- `PreviousSpendings.test.jsx` — 12-card grid, note snippet, truncation, empty state
 
 **Context wrapper for component tests:** Import `AppContext` from `App.jsx` and wrap with `<AppContext.Provider value={mockCtx}>`. The mock context needs `data`, `navigateTo`, and whichever action callbacks the component uses — see existing test files for the pattern.
 
@@ -76,6 +80,12 @@ Two layers, both managed in `App.jsx`:
 
 When adding new top-level fields to the data shape, backfill them in three places: the empty-localStorage return in `loadData()`, the parsed-JSON return in `loadData()`, and the file-recovery `setData` call in `App.jsx`.
 
+### Navigation and prevView
+
+`App.jsx` tracks navigation with two pieces of state: `view` (current view string) and `prevView` (the view before the last `navigateTo` call). `prevView` is stored in both a ref (`prevViewRef`) and state so components can read it from context. The ref is updated synchronously inside `navigateTo` before `setView` fires, ensuring the captured value is always the view the user navigated *from*.
+
+`MonthView` uses `prevView` for its back button: `navigateTo(prevView || (isCurrent ? 'home' : 'previous'))`. This means back from a month opened via Search returns to Search, not PreviousSpendings.
+
 ### Views
 
 | `view` value | Component |
@@ -91,15 +101,16 @@ When adding new top-level fields to the data shape, backfill them in three place
 
 ### Key component notes
 
+- **`Header.jsx`** — nav is split into two groups by thin `.header__sep` dividers: primary (Početna, Prethodne, 🔍) and tools (Budžet, Praćenje, Kategorije), followed by autosave status and theme toggle. "Prethodne" is active for both `view === 'previous'` and `view === 'month'`.
+- **`Home.jsx`** — hero row has the greeting text centered and a circular `+` button (`home__add-btn`) positioned `absolute; right: 0` so it doesn't shift the centered text. Clicking opens `ExpenseModal` with today's date via local `adding` state — the modal is managed in Home, not App. The "Pogledaj prethodne potrošnje" action card was removed (superseded by the Prethodne nav button). Renders `SavingsGoals` at the bottom.
+- **`BudgetPanel.jsx`** — renders inside `MonthView` above the expense list; shows live fund vs. actual spend as compact single-column rows (`bp-row`): dot indicator | fund name | progress bar | spent/allocated | remaining. Returns null if no funds have tracking categories mapped.
 - **`BudgetView.jsx`** — year is local state (‹/› nav buttons); `currentMonth` highlight only applies for the actual current year. "📋 Kopiraj u {year+1}" copies fund structure + plata income + tracking category links to the next year (double-click confirmation if target already has data). `copyBudgetToYear` in App.jsx assigns new fund IDs and remaps `trackingMaps`.
-- **`BudgetPanel.jsx`** — rendered inside `MonthView` above the expense list; shows live fund vs. actual spend status (green/orange/red) using `trackingMaps` to link funds to categories.
 - **`Charts.jsx`** — rendered above the expense list when toggled; pie chart for category breakdown, bar chart for month comparison.
 - **`TrackingSetup.jsx`** — maps budget fund IDs to expense category names; auto-saves on every pill toggle.
 - **`GlobalSearch.jsx`** — searches across all expenses (title, category, note), sorted by date desc; clicking a result navigates to that month's MonthView.
-- **`Home.jsx`** — shows "Ponavljajući troškovi" section when `data.recurrings` is non-empty; renders `SavingsGoals` component at the bottom; hosts JSON and CSV export buttons.
 - **`SavingsGoals.jsx`** — savings goal list with progress bars; progress = sum of all non-null amounts in the linked budget fund for the linked year. Goal year select defaults to the most recent budget year that exists. Delete requires two clicks.
 - **`MonthView.jsx`** — includes a monthly-note textarea between the stats row and BudgetPanel; saves on blur only when text has changed.
-- **`PreviousSpendings.jsx`** — shows a note snippet (≤55 chars) at the bottom of each month card when a `monthlyNotes` entry exists.
+- **`PreviousSpendings.jsx`** — shows a note snippet (≤55 chars) at the bottom of each month card when a `monthlyNotes` entry exists. Important: when adding fields to the `monthsData` useMemo result objects, always destructure them in the `.map()` callback or they will be silently undefined in JSX.
 
 ### Recurring expenses
 

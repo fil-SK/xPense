@@ -11,7 +11,6 @@ import MonthView from './components/MonthView.jsx';
 import PreviousSpendings from './components/PreviousSpendings.jsx';
 import CategoryManager from './components/CategoryManager.jsx';
 import BudgetView from './components/BudgetView.jsx';
-import TrackingSetup from './components/TrackingSetup.jsx';
 import GlobalSearch from './components/GlobalSearch.jsx';
 
 export const AppContext = createContext(null);
@@ -372,7 +371,6 @@ export default function App() {
           )}
           {view === 'categories' && <CategoryManager />}
           {view === 'budget' && <BudgetView />}
-          {view === 'tracking' && <TrackingSetup />}
           {view === 'search' && <GlobalSearch />}
         </main>
 

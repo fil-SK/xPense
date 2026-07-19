@@ -23,6 +23,13 @@ function renderHeader(ctxOverrides = {}) {
   return { navigateTo };
 }
 
+describe('Header — removed Praćenje button', () => {
+  test('does not render Praćenje nav button', () => {
+    renderHeader();
+    expect(screen.queryByRole('button', { name: /praćenje/i })).not.toBeInTheDocument();
+  });
+});
+
 describe('Header — Prethodne button', () => {
   test('renders Prethodne button', () => {
     renderHeader();

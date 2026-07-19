@@ -844,6 +844,51 @@ thead .bg__col--current { background: #e0e7ff !important; }
 .bg__del-btn:hover { color: var(--danger); background: var(--danger-light); }
 .bg__del-btn--confirm { opacity: 1 !important; color: var(--warning) !important; }
 
+/* Category chip on fund rows */
+.bg__cat-chip {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.6;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.bg__cat-chip:hover,
+.bg__cat-chip--open {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Inline tracking panel */
+.bg__tracking-row > td {
+  padding: 0;
+  background: var(--bg);
+  border-bottom: 2px solid var(--primary-light);
+}
+.bg__tracking-cell { padding: 10px 16px 14px; }
+.bg__tracking-panel {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+}
+.bg__tracking-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  white-space: nowrap;
+  padding-top: 5px;
+}
+.bg__tracking-pills { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
+
 /* Add fund row */
 .bg__add-row > td { border-top: 1px dashed var(--border); }
 .bg__add-cell {
@@ -1189,6 +1234,7 @@ html.dark .bg__col--current { background: #1e1b4b !important; }
 html.dark thead .bg__col--current { background: #312e81 !important; }
 html.dark .bg__subtotal-row > td { background: #162032; }
 html.dark .bg__section-row td { background: #0f172a; }
+html.dark .bg__tracking-row > td { background: #1e293b; }
 
 /* Inputs inside budget grid */
 html.dark .bgc-input,
