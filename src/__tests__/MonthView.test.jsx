@@ -5,6 +5,7 @@ import MonthView from '../components/MonthView.jsx';
 
 function renderMonthView(dataOverrides = {}, ctxOverrides = {}) {
   const setMonthlyNote = vi.fn();
+  const navigateTo = vi.fn();
   const ctx = {
     data: {
       expenses: [],
@@ -16,7 +17,8 @@ function renderMonthView(dataOverrides = {}, ctxOverrides = {}) {
       savingsGoals: [],
       ...dataOverrides,
     },
-    navigateTo: vi.fn(),
+    navigateTo,
+    prevView: null,
     setMonthlyNote,
     ...ctxOverrides,
   };
@@ -25,8 +27,24 @@ function renderMonthView(dataOverrides = {}, ctxOverrides = {}) {
       <MonthView year={2025} month={2} />
     </AppContext.Provider>
   );
-  return { setMonthlyNote };
+  return { setMonthlyNote, navigateTo };
 }
+
+describe('MonthView — back navigation', () => {
+  test('back button uses prevView from context when set', async () => {
+    const user = userEvent.setup();
+    const { navigateTo } = renderMonthView({}, { prevView: 'search' });
+    await user.click(screen.getByTitle('Nazad'));
+    expect(navigateTo).toHaveBeenCalledWith('search');
+  });
+
+  test('back button falls back to "previous" when prevView is null and not isCurrent', async () => {
+    const user = userEvent.setup();
+    const { navigateTo } = renderMonthView({}, { prevView: null });
+    await user.click(screen.getByTitle('Nazad'));
+    expect(navigateTo).toHaveBeenCalledWith('previous');
+  });
+});
 
 describe('MonthView — monthly note', () => {
   test('renders note textarea with placeholder', () => {

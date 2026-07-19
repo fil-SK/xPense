@@ -63,7 +63,7 @@ export default function PreviousSpendings() {
       </div>
 
       <div className="months-grid">
-        {monthsData.map(({ month, total, count, isFuture, isCurrent }) => (
+        {monthsData.map(({ month, total, count, isFuture, isCurrent, note }) => (
           <div
             key={month}
             className="month-card"

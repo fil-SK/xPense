@@ -11,17 +11,16 @@ export default function Header() {
         </div>
         <nav className="header__nav">
           <button
-            className="header__btn header__theme-btn"
-            onClick={toggleDarkMode}
-            title={darkMode ? 'Svetla tema' : 'Tamna tema'}
-          >
-            {darkMode ? '☀️' : '🌙'}
-          </button>
-          <button
             className={`header__btn ${view === 'home' ? 'header__btn--active' : ''}`}
             onClick={() => navigateTo('home')}
           >
             Početna
+          </button>
+          <button
+            className={`header__btn ${view === 'previous' || view === 'month' ? 'header__btn--active' : ''}`}
+            onClick={() => navigateTo('previous')}
+          >
+            Prethodne
           </button>
           <button
             className={`header__btn ${view === 'search' ? 'header__btn--active' : ''}`}
@@ -30,6 +29,9 @@ export default function Header() {
           >
             🔍
           </button>
+
+          <div className="header__sep" />
+
           <button
             className={`header__btn ${view === 'budget' ? 'header__btn--active' : ''}`}
             onClick={() => navigateTo('budget')}
@@ -48,6 +50,8 @@ export default function Header() {
           >
             Kategorije
           </button>
+
+          <div className="header__sep" />
 
           {autosaveStatus === 'none' && (
             <button
@@ -84,6 +88,13 @@ export default function Header() {
               💾 !
             </button>
           )}
+          <button
+            className="header__btn header__theme-btn"
+            onClick={toggleDarkMode}
+            title={darkMode ? 'Svetla tema' : 'Tamna tema'}
+          >
+            {darkMode ? '☀️' : '🌙'}
+          </button>
         </nav>
       </div>
     </header>

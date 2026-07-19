@@ -3,11 +3,11 @@ import { getExpensesForMonth } from '../utils/helpers.js';
 
 const THRESHOLD_WARN = 0.9;
 
-function statusClass(ratio) {
-  if (ratio === null) return 'bp-card--unset';
-  if (ratio > 1) return 'bp-card--over';
-  if (ratio >= THRESHOLD_WARN) return 'bp-card--warn';
-  return 'bp-card--ok';
+function statusKey(ratio) {
+  if (ratio === null) return 'unset';
+  if (ratio > 1) return 'over';
+  if (ratio >= THRESHOLD_WARN) return 'warn';
+  return 'ok';
 }
 
 function fmt(n) {
@@ -31,7 +31,7 @@ export default function BudgetPanel({ year, month }) {
   return (
     <div className="bp">
       <div className="bp__label">Praćenje budžeta</div>
-      <div className="bp__cards">
+      <div className="bp__rows">
         {trackedFunds.map((fund) => {
           const allocated = fund.amounts[month] ?? null;
           const mappedCats = yearMaps[fund.id] ?? [];
@@ -42,32 +42,29 @@ export default function BudgetPanel({ year, month }) {
           const ratio = allocated !== null ? spent / allocated : null;
           const remaining = allocated !== null ? allocated - spent : null;
           const isOver = remaining !== null && remaining < 0;
+          const key = statusKey(ratio);
 
           return (
-            <div key={fund.id} className={`bp-card ${statusClass(ratio)}`}>
-              <div className="bp-card__name">{fund.name}</div>
-
+            <div key={fund.id} className={`bp-row bp-row--${key}`}>
+              <div className="bp-row__dot" />
+              <div className="bp-row__name">{fund.name}</div>
               {allocated === null ? (
-                <div className="bp-card__unset">nije postavljeno</div>
+                <div className="bp-row__unset">nije postavljeno</div>
               ) : (
                 <>
-                  <div className="bp-card__amounts">
-                    <span className="bp-card__spent">{fmt(spent)}</span>
-                    <span className="bp-card__sep"> / </span>
-                    <span className="bp-card__alloc">{fmt(allocated)} RSD</span>
-                  </div>
-
-                  <div className="bp-card__bar-wrap">
+                  <div className="bp-row__bar">
                     <div
-                      className="bp-card__bar-fill"
+                      className="bp-row__bar-fill"
                       style={{ width: `${Math.min(ratio * 100, 100)}%` }}
                     />
                   </div>
-
-                  <div className="bp-card__remaining">
+                  <div className="bp-row__amounts">
+                    {fmt(spent)} / {fmt(allocated)} RSD
+                  </div>
+                  <div className="bp-row__remaining">
                     {isOver
-                      ? `−${fmt(Math.abs(remaining))} RSD`
-                      : `+${fmt(remaining)} RSD`}
+                      ? `−${fmt(Math.abs(remaining))}`
+                      : `+${fmt(remaining)}`}
                   </div>
                 </>
               )}

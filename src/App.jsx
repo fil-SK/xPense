@@ -23,6 +23,8 @@ export default function App() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [toast, setToast] = useState(null);
+  const prevViewRef = useRef('home');
+  const [prevView, setPrevView] = useState('home');
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem('expense-tracker-theme') === 'dark';
   });
@@ -124,6 +126,8 @@ export default function App() {
   }, [showToast]);
 
   const navigateTo = useCallback((v, year, month) => {
+    setPrevView(prevViewRef.current);
+    prevViewRef.current = v;
     setView(v);
     if (year != null) setSelectedYear(year);
     if (month != null) setSelectedMonth(month);
@@ -316,6 +320,7 @@ export default function App() {
   const ctx = {
     data,
     view,
+    prevView,
     selectedYear,
     selectedMonth,
     navigateTo,

@@ -1,10 +1,13 @@
+import { useState } from 'react';
 import { useApp } from '../App.jsx';
-import { getExpensesForMonth, getTotalAmount, formatAmount, getMonthName } from '../utils/helpers.js';
+import { getExpensesForMonth, getTotalAmount, formatAmount, getMonthName, todayISO } from '../utils/helpers.js';
 import { exportJSON, exportCSV, importJSON } from '../utils/storage.js';
 import SavingsGoals from './SavingsGoals.jsx';
+import ExpenseModal from './ExpenseModal.jsx';
 
 export default function Home() {
   const { data, navigateTo, importData, showToast, deleteRecurring } = useApp();
+  const [adding, setAdding] = useState(false);
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
@@ -29,8 +32,13 @@ export default function Home() {
   return (
     <div className="home">
       <div className="home__hero">
-        <div className="home__greeting">
-          Zdravo! 👋 <span>Kontroliši</span> svoje troškove.
+        <div className="home__hero__row">
+          <div className="home__greeting">
+            Zdravo! 👋 <span>Kontroliši</span> svoje troškove.
+          </div>
+          <button className="home__add-btn" onClick={() => setAdding(true)} title="Dodaj trošak" aria-label="Dodaj trošak">
+            +
+          </button>
         </div>
         <div className="home__sub">
           {getMonthName(month)} {year} — pratite, analizirajte, štedite.
@@ -71,13 +79,6 @@ export default function Home() {
           <div className="action-card__title">Potrošnja ovog meseca</div>
           <div className="action-card__desc">
             Pregledaj i unesi troškove za {getMonthName(month)} {year}.
-          </div>
-        </div>
-        <div className="action-card" onClick={() => navigateTo('previous')}>
-          <div className="action-card__icon">🗂️</div>
-          <div className="action-card__title">Pogledaj prethodne potrošnje</div>
-          <div className="action-card__desc">
-            Filtriraj po godini i mesecu. Analiziraj istoriju troškova.
           </div>
         </div>
         <div className="action-card" onClick={() => navigateTo('budget')}>
@@ -129,6 +130,10 @@ export default function Home() {
       )}
 
       <SavingsGoals />
+
+      {adding && (
+        <ExpenseModal defaultDate={todayISO()} onClose={() => setAdding(false)} />
+      )}
     </div>
   );
 }

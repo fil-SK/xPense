@@ -31,7 +31,7 @@ function sortExpenses(expenses, sort) {
 }
 
 export default function MonthView({ year, month, isCurrent }) {
-  const { data, navigateTo, setMonthlyNote } = useApp();
+  const { data, navigateTo, prevView, setMonthlyNote } = useApp();
   const [adding, setAdding] = useState(false);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('date-desc');
@@ -83,7 +83,7 @@ export default function MonthView({ year, month, isCurrent }) {
       <div className="month-header">
         <button
           className="month-header__back"
-          onClick={() => navigateTo(isCurrent ? 'home' : 'previous')}
+          onClick={() => navigateTo(prevView || (isCurrent ? 'home' : 'previous'))}
           title="Nazad"
         >
           ←
