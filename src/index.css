@@ -961,6 +961,75 @@ thead .bg__col--current { background: #e0e7ff !important; }
 .bp-card--over .bp-card__remaining { color: var(--danger); }
 .bp-card--unset .bp-card__remaining { color: var(--text-muted); }
 
+/* ── Global Search ───────────────────────────────────────────────────────── */
+.gsearch { display: flex; flex-direction: column; gap: 20px; }
+.gsearch__header { display: flex; align-items: center; gap: 12px; }
+.gsearch__title { font-size: 24px; font-weight: 800; letter-spacing: -0.4px; }
+.gsearch__input {
+  padding: 12px 16px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 16px;
+  font-family: inherit;
+  background: var(--bg-card);
+  color: var(--text);
+  outline: none;
+  transition: border-color .15s;
+  width: 100%;
+}
+.gsearch__input:focus { border-color: var(--primary); }
+.gsearch__meta { font-size: 13px; color: var(--text-muted); }
+.gsearch__month-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+/* ── Recurring expenses ───────────────────────────────────────────────────── */
+.expense-item__recurring { font-size: 11px; }
+.home__section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.home__recurring { display: flex; flex-direction: column; gap: 10px; }
+.recurring-list {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--sh-sm);
+  overflow: hidden;
+}
+.recurring-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.recurring-item:last-child { border-bottom: none; }
+.recurring-item__icon { font-size: 15px; flex-shrink: 0; }
+.recurring-item__body { flex: 1; min-width: 0; }
+.recurring-item__title { font-weight: 600; font-size: 14px; }
+.recurring-item__meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+/* ── Form checkbox ────────────────────────────────────────────────────────── */
+.form-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text);
+}
+.form-check input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary); }
+
 /* ── Dark mode ───────────────────────────────────────────────────────────── */
 html.dark {
   --bg: #0f172a;

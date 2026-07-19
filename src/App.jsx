@@ -11,6 +11,7 @@ import PreviousSpendings from './components/PreviousSpendings.jsx';
 import CategoryManager from './components/CategoryManager.jsx';
 import BudgetView from './components/BudgetView.jsx';
 import TrackingSetup from './components/TrackingSetup.jsx';
+import GlobalSearch from './components/GlobalSearch.jsx';
 
 const AppContext = createContext(null);
 export const useApp = () => useContext(AppContext);
@@ -53,6 +54,7 @@ export default function App() {
                 categories: fileData.categories ?? [],
                 budget: fileData.budget ?? {},
                 trackingMaps: fileData.trackingMaps ?? {},
+                recurrings: fileData.recurrings ?? [],
               });
             }
           } catch { }
@@ -75,6 +77,47 @@ export default function App() {
       localStorage.setItem('expense-tracker-theme', 'light');
     }
   }, [darkMode]);
+
+  // Auto-generate expense entries for recurring templates (runs on mount + when templates change)
+  useEffect(() => {
+    if (!data.recurrings?.length) return;
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const curMonth = now.getMonth();
+    setData((d) => {
+      if (!d.recurrings?.length) return d;
+      const newExpenses = [];
+      for (const r of d.recurrings) {
+        const start = new Date(r.startDate + 'T00:00:00');
+        const sy = start.getFullYear();
+        const sm = start.getMonth();
+        const day = String(start.getDate()).padStart(2, '0');
+        for (let y = sy; y <= curYear; y++) {
+          const mFrom = y === sy ? sm : 0;
+          const mTo = y === curYear ? curMonth : 11;
+          for (let m = mFrom; m <= mTo; m++) {
+            const monthStr = `${y}-${String(m + 1).padStart(2, '0')}`;
+            const exists = d.expenses.some(
+              (e) => e.recurringId === r.id && e.date.startsWith(monthStr)
+            );
+            if (!exists) {
+              newExpenses.push({
+                id: crypto.randomUUID(),
+                recurringId: r.id,
+                title: r.title,
+                amount: r.amount,
+                category: r.category,
+                note: r.note || '',
+                date: `${monthStr}-${day}`,
+              });
+            }
+          }
+        }
+      }
+      if (newExpenses.length === 0) return d;
+      return { ...d, expenses: [...d.expenses, ...newExpenses] };
+    });
+  }, [data.recurrings]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const showToast = useCallback((msg, type = 'success') => {
     setToast({ msg, type });
@@ -257,6 +300,46 @@ export default function App() {
     });
   }, []);
 
+  const copyBudgetToYear = useCallback((fromYear, toYear) => {
+    setData((d) => {
+      const source = d.budget?.[fromYear];
+      if (!source) return d;
+      const fundIdMap = {};
+      const newFunds = source.funds.map((f) => {
+        const newId = crypto.randomUUID();
+        fundIdMap[f.id] = newId;
+        return { id: newId, name: f.name, amounts: Array(12).fill(null) };
+      });
+      const sourceTracking = d.trackingMaps?.[fromYear] ?? {};
+      const newTracking = Object.fromEntries(
+        Object.entries(sourceTracking).map(([oldId, cats]) => [fundIdMap[oldId] ?? oldId, cats])
+      );
+      return {
+        ...d,
+        budget: {
+          ...d.budget,
+          [toYear]: {
+            income: { plata: [...source.income.plata], bonus: Array(12).fill(null) },
+            funds: newFunds,
+          },
+        },
+        trackingMaps: { ...d.trackingMaps, [toYear]: newTracking },
+      };
+    });
+  }, []);
+
+  const addRecurring = useCallback((recurring) => {
+    setData((d) => ({
+      ...d,
+      recurrings: [...(d.recurrings ?? []), { ...recurring, id: crypto.randomUUID() }],
+    }));
+  }, []);
+
+  const deleteRecurring = useCallback((id) => {
+    setData((d) => ({ ...d, recurrings: d.recurrings.filter((r) => r.id !== id) }));
+    showToast('Ponavljajući trošak uklonjen.', 'danger');
+  }, [showToast]);
+
   const ctx = {
     data,
     view,
@@ -279,6 +362,9 @@ export default function App() {
     renameBudgetFund,
     reorderBudgetFunds,
     updateTrackingMap,
+    copyBudgetToYear,
+    addRecurring,
+    deleteRecurring,
     darkMode,
     toggleDarkMode: () => setDarkMode((v) => !v),
     autosaveStatus,
@@ -306,6 +392,7 @@ export default function App() {
           {view === 'categories' && <CategoryManager />}
           {view === 'budget' && <BudgetView />}
           {view === 'tracking' && <TrackingSetup />}
+          {view === 'search' && <GlobalSearch />}
         </main>
 
         {toast && (

@@ -3,7 +3,7 @@ import { todayISO, CHART_COLORS } from '../utils/helpers.js';
 import { useApp } from '../App.jsx';
 
 export default function ExpenseModal({ expense, defaultDate, onClose }) {
-  const { data, addExpense, updateExpense } = useApp();
+  const { data, addExpense, updateExpense, addRecurring } = useApp();
   const isEdit = !!expense;
 
   const [form, setForm] = useState(
@@ -12,6 +12,7 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
       : { title: '', date: defaultDate ?? todayISO(), amount: '', category: data.categories[0] ?? '', note: '' }
   );
   const [errors, setErrors] = useState({});
+  const [recurring, setRecurring] = useState(false);
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose(); };
@@ -44,8 +45,13 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
       category: form.category,
       note: form.note.trim(),
     };
-    if (isEdit) updateExpense(expense.id, payload);
-    else addExpense(payload);
+    if (isEdit) {
+      updateExpense(expense.id, payload);
+    } else if (recurring) {
+      addRecurring({ ...payload, startDate: payload.date, frequency: 'monthly' });
+    } else {
+      addExpense(payload);
+    }
     onClose();
   }
 
@@ -129,6 +135,19 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
             placeholder="Dodatni detalji..."
           />
         </div>
+
+        {!isEdit && (
+          <div className="form-group">
+            <label className="form-check">
+              <input
+                type="checkbox"
+                checked={recurring}
+                onChange={(e) => setRecurring(e.target.checked)}
+              />
+              <span>Ponavljajući trošak — automatski svaki mesec</span>
+            </label>
+          </div>
+        )}
 
         <div className="modal__footer">
           <button className="btn btn--ghost" onClick={onClose}>Otkaži</button>

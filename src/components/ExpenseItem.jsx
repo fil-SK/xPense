@@ -36,6 +36,7 @@ export default function ExpenseItem({ expense }) {
             <span className="expense-item__cat-badge" style={{ background: color + '22', color }}>
               {expense.category}
             </span>
+            {expense.recurringId && <span className="expense-item__recurring" title="Ponavljajući trošak">🔄</span>}
             {expense.note && <span title={expense.note}>📝</span>}
           </div>
         </div>

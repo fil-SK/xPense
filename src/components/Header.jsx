@@ -24,6 +24,13 @@ export default function Header() {
             Početna
           </button>
           <button
+            className={`header__btn ${view === 'search' ? 'header__btn--active' : ''}`}
+            onClick={() => navigateTo('search')}
+            title="Pretraži sve troškove"
+          >
+            🔍
+          </button>
+          <button
             className={`header__btn ${view === 'budget' ? 'header__btn--active' : ''}`}
             onClick={() => navigateTo('budget')}
           >

@@ -3,7 +3,7 @@ import { getExpensesForMonth, getTotalAmount, formatAmount, getMonthName } from 
 import { exportJSON, importJSON } from '../utils/storage.js';
 
 export default function Home() {
-  const { data, navigateTo, importData, showToast } = useApp();
+  const { data, navigateTo, importData, showToast, deleteRecurring } = useApp();
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
@@ -97,6 +97,32 @@ export default function Home() {
           <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
         </label>
       </div>
+
+      {data.recurrings?.length > 0 && (
+        <div className="home__recurring">
+          <div className="home__section-title">Ponavljajući troškovi</div>
+          <div className="recurring-list">
+            {data.recurrings.map((r) => (
+              <div key={r.id} className="recurring-item">
+                <span className="recurring-item__icon">🔄</span>
+                <div className="recurring-item__body">
+                  <div className="recurring-item__title">{r.title}</div>
+                  <div className="recurring-item__meta">
+                    {formatAmount(r.amount)} · {r.category} · mesečno od {r.startDate.slice(0, 7)}
+                  </div>
+                </div>
+                <button
+                  className="btn btn--icon btn--ghost btn--sm"
+                  title="Ukloni ponavljajući trošak (prethodni unosi ostaju)"
+                  onClick={() => deleteRecurring(r.id)}
+                >
+                  🗑️
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

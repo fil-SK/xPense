@@ -23,9 +23,10 @@ export function loadData() {
       categories: parsed.categories ?? [...DEFAULT_CATEGORIES],
       budget: parsed.budget ?? {},
       trackingMaps: parsed.trackingMaps ?? {},
+      recurrings: parsed.recurrings ?? [],
     };
   } catch {
-    return { expenses: [], categories: [...DEFAULT_CATEGORIES], budget: {}, trackingMaps: {} };
+    return { expenses: [], categories: [...DEFAULT_CATEGORIES], budget: {}, trackingMaps: {}, recurrings: [] };
   }
 }
 
@@ -59,6 +60,7 @@ export function importJSON(file) {
           categories: parsed.categories,
           budget: parsed.budget ?? {},
           trackingMaps: parsed.trackingMaps ?? {},
+          recurrings: parsed.recurrings ?? [],
         });
       } catch {
         reject(new Error('Neispravan JSON fajl.'));

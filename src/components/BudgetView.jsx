@@ -155,7 +155,7 @@ export default function BudgetView() {
   const {
     data, updateBudgetIncome, updateBudgetFund, addBudgetFund,
     removeBudgetFund, renameBudgetFund, reorderBudgetFunds,
-    importBudgetData, showToast,
+    copyBudgetToYear, importBudgetData, showToast,
   } = useApp();
 
   const thisYear = new Date().getFullYear();
@@ -171,6 +171,7 @@ export default function BudgetView() {
   const [editingFundId, setEditingFundId] = useState(null);
   const [editingFundName, setEditingFundName] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [copyConfirm, setCopyConfirm] = useState(false);
   const addInputRef = useRef(null);
 
   const sensors = useSensors(
@@ -218,6 +219,24 @@ export default function BudgetView() {
     setEditingFundId(null);
   }
 
+  function handleCopyToNextYear() {
+    const nextYear = year + 1;
+    const hasExisting = !!(
+      data.budget?.[nextYear] &&
+      (data.budget[nextYear].funds?.length > 0 ||
+        data.budget[nextYear].income?.plata.some((v) => v != null))
+    );
+    if (hasExisting && !copyConfirm) {
+      setCopyConfirm(true);
+      setTimeout(() => setCopyConfirm(false), 3000);
+      return;
+    }
+    copyBudgetToYear(year, nextYear);
+    setCopyConfirm(false);
+    setYear(nextYear);
+    showToast(`Budžet kopiran u ${nextYear}.`);
+  }
+
   function handleDragEnd(event) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -242,6 +261,13 @@ export default function BudgetView() {
           Kliknite na ćeliju da unesete vrednost · Dvoklikom na naziv fonda ga preimenujete · Prevucite ⠿ da promenite redosled
         </div>
         <div className="budget__tools">
+          <button
+            className={`btn btn--sm ${copyConfirm ? 'btn--danger' : 'btn--ghost'}`}
+            onClick={handleCopyToNextYear}
+            title={`Kopiraj fondove i platu iz ${year} u ${year + 1}`}
+          >
+            {copyConfirm ? `⚠ Prepiši ${year + 1}?` : `📋 Kopiraj u ${year + 1}`}
+          </button>
           <button className="btn btn--ghost btn--sm" onClick={() => exportBudget(data.budget, year)}>
             ⬇ Izvezi budžet
           </button>
