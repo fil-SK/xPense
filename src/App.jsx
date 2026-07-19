@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, createContext, useContext } from 'react';
 import { loadData, saveData } from './utils/storage.js';
+import { generateRecurringExpenses, applyBudgetCopy } from './utils/dataTransforms.js';
 import {
   getStoredHandle, checkPermission, grantPermission,
   readFromFile, writeToFile, pickFile,
@@ -13,7 +14,7 @@ import BudgetView from './components/BudgetView.jsx';
 import TrackingSetup from './components/TrackingSetup.jsx';
 import GlobalSearch from './components/GlobalSearch.jsx';
 
-const AppContext = createContext(null);
+export const AppContext = createContext(null);
 export const useApp = () => useContext(AppContext);
 
 export default function App() {
@@ -55,6 +56,8 @@ export default function App() {
                 budget: fileData.budget ?? {},
                 trackingMaps: fileData.trackingMaps ?? {},
                 recurrings: fileData.recurrings ?? [],
+                monthlyNotes: fileData.monthlyNotes ?? {},
+                savingsGoals: fileData.savingsGoals ?? [],
               });
             }
           } catch { }
@@ -78,44 +81,15 @@ export default function App() {
     }
   }, [darkMode]);
 
-  // Auto-generate expense entries for recurring templates (runs on mount + when templates change)
   useEffect(() => {
     if (!data.recurrings?.length) return;
     const now = new Date();
-    const curYear = now.getFullYear();
-    const curMonth = now.getMonth();
     setData((d) => {
       if (!d.recurrings?.length) return d;
-      const newExpenses = [];
-      for (const r of d.recurrings) {
-        const start = new Date(r.startDate + 'T00:00:00');
-        const sy = start.getFullYear();
-        const sm = start.getMonth();
-        const day = String(start.getDate()).padStart(2, '0');
-        for (let y = sy; y <= curYear; y++) {
-          const mFrom = y === sy ? sm : 0;
-          const mTo = y === curYear ? curMonth : 11;
-          for (let m = mFrom; m <= mTo; m++) {
-            const monthStr = `${y}-${String(m + 1).padStart(2, '0')}`;
-            const exists = d.expenses.some(
-              (e) => e.recurringId === r.id && e.date.startsWith(monthStr)
-            );
-            if (!exists) {
-              newExpenses.push({
-                id: crypto.randomUUID(),
-                recurringId: r.id,
-                title: r.title,
-                amount: r.amount,
-                category: r.category,
-                note: r.note || '',
-                date: `${monthStr}-${day}`,
-              });
-            }
-          }
-        }
-      }
-      if (newExpenses.length === 0) return d;
-      return { ...d, expenses: [...d.expenses, ...newExpenses] };
+      const generated = generateRecurringExpenses(d.recurrings, d.expenses, now);
+      if (generated.length === 0) return d;
+      const withIds = generated.map((e) => ({ ...e, id: crypto.randomUUID() }));
+      return { ...d, expenses: [...d.expenses, ...withIds] };
     });
   }, [data.recurrings]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -301,32 +275,31 @@ export default function App() {
   }, []);
 
   const copyBudgetToYear = useCallback((fromYear, toYear) => {
-    setData((d) => {
-      const source = d.budget?.[fromYear];
-      if (!source) return d;
-      const fundIdMap = {};
-      const newFunds = source.funds.map((f) => {
-        const newId = crypto.randomUUID();
-        fundIdMap[f.id] = newId;
-        return { id: newId, name: f.name, amounts: Array(12).fill(null) };
-      });
-      const sourceTracking = d.trackingMaps?.[fromYear] ?? {};
-      const newTracking = Object.fromEntries(
-        Object.entries(sourceTracking).map(([oldId, cats]) => [fundIdMap[oldId] ?? oldId, cats])
-      );
-      return {
-        ...d,
-        budget: {
-          ...d.budget,
-          [toYear]: {
-            income: { plata: [...source.income.plata], bonus: Array(12).fill(null) },
-            funds: newFunds,
-          },
-        },
-        trackingMaps: { ...d.trackingMaps, [toYear]: newTracking },
-      };
-    });
+    setData((d) => applyBudgetCopy(d, fromYear, toYear));
   }, []);
+
+  const setMonthlyNote = useCallback((year, month, text) => {
+    setData((d) => ({
+      ...d,
+      monthlyNotes: {
+        ...(d.monthlyNotes ?? {}),
+        [year]: { ...(d.monthlyNotes?.[year] ?? {}), [month]: text },
+      },
+    }));
+  }, []);
+
+  const addSavingsGoal = useCallback((goal) => {
+    setData((d) => ({
+      ...d,
+      savingsGoals: [...(d.savingsGoals ?? []), { ...goal, id: crypto.randomUUID() }],
+    }));
+    showToast('Cilj dodat.');
+  }, [showToast]);
+
+  const deleteSavingsGoal = useCallback((id) => {
+    setData((d) => ({ ...d, savingsGoals: (d.savingsGoals ?? []).filter((g) => g.id !== id) }));
+    showToast('Cilj obrisan.', 'danger');
+  }, [showToast]);
 
   const addRecurring = useCallback((recurring) => {
     setData((d) => ({
@@ -365,6 +338,9 @@ export default function App() {
     copyBudgetToYear,
     addRecurring,
     deleteRecurring,
+    setMonthlyNote,
+    addSavingsGoal,
+    deleteSavingsGoal,
     darkMode,
     toggleDarkMode: () => setDarkMode((v) => !v),
     autosaveStatus,

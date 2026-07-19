@@ -1,6 +1,7 @@
 import { useApp } from '../App.jsx';
 import { getExpensesForMonth, getTotalAmount, formatAmount, getMonthName } from '../utils/helpers.js';
-import { exportJSON, importJSON } from '../utils/storage.js';
+import { exportJSON, exportCSV, importJSON } from '../utils/storage.js';
+import SavingsGoals from './SavingsGoals.jsx';
 
 export default function Home() {
   const { data, navigateTo, importData, showToast, deleteRecurring } = useApp();
@@ -92,6 +93,9 @@ export default function Home() {
         <button className="btn btn--ghost btn--sm" onClick={() => exportJSON(data)}>
           ⬇️ Izvezi JSON (za Claude)
         </button>
+        <button className="btn btn--ghost btn--sm" onClick={() => exportCSV(data)}>
+          ⬇️ Izvezi CSV (Excel)
+        </button>
         <label className="btn btn--ghost btn--sm" style={{ cursor: 'pointer' }}>
           ⬆️ Uvezi JSON
           <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
@@ -123,6 +127,8 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      <SavingsGoals />
     </div>
   );
 }

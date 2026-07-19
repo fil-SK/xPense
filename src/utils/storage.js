@@ -16,7 +16,7 @@ const DEFAULT_CATEGORIES = [
 export function loadData() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { expenses: [], categories: [...DEFAULT_CATEGORIES], budget: {}, trackingMaps: {} };
+    if (!raw) return { expenses: [], categories: [...DEFAULT_CATEGORIES], budget: {}, trackingMaps: {}, recurrings: [], monthlyNotes: {}, savingsGoals: [] };
     const parsed = JSON.parse(raw);
     return {
       expenses: parsed.expenses ?? [],
@@ -24,9 +24,11 @@ export function loadData() {
       budget: parsed.budget ?? {},
       trackingMaps: parsed.trackingMaps ?? {},
       recurrings: parsed.recurrings ?? [],
+      monthlyNotes: parsed.monthlyNotes ?? {},
+      savingsGoals: parsed.savingsGoals ?? [],
     };
   } catch {
-    return { expenses: [], categories: [...DEFAULT_CATEGORIES], budget: {}, trackingMaps: {}, recurrings: [] };
+    return { expenses: [], categories: [...DEFAULT_CATEGORIES], budget: {}, trackingMaps: {}, recurrings: [], monthlyNotes: {}, savingsGoals: [] };
   }
 }
 
@@ -69,6 +71,35 @@ export function importJSON(file) {
     reader.onerror = () => reject(new Error('Greška pri čitanju fajla.'));
     reader.readAsText(file);
   });
+}
+
+function csvField(val) {
+  const s = String(val == null ? '' : val);
+  if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+export function buildCSVString(expenses) {
+  const header = ['Datum', 'Naziv', 'Iznos', 'Kategorija', 'Napomena', 'Ponavljajuci'];
+  const sorted = [...expenses].sort((a, b) => b.date.localeCompare(a.date));
+  const rows = sorted.map((e) =>
+    [e.date, e.title, e.amount, e.category, e.note || '', e.recurringId ? 'Da' : 'Ne'].map(csvField)
+  );
+  return [header, ...rows].map((r) => r.join(',')).join('\r\n');
+}
+
+export function exportCSV(data) {
+  const csv = '﻿' + buildCSVString(data.expenses);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const date = new Date().toISOString().split('T')[0];
+  a.download = `troskovi-${date}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export function exportBudget(budget, year) {

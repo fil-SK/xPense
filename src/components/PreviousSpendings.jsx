@@ -21,9 +21,10 @@ export default function PreviousSpendings() {
       const total = getTotalAmount(exps);
       const isFuture = selectedYear === currentYear && m > currentMonth;
       const isCurrent = selectedYear === currentYear && m === currentMonth;
-      return { month: m, total, count: exps.length, isFuture, isCurrent };
+      const note = data.monthlyNotes?.[selectedYear]?.[m] ?? '';
+      return { month: m, total, count: exps.length, isFuture, isCurrent, note };
     });
-  }, [data.expenses, selectedYear, currentYear, currentMonth]);
+  }, [data.expenses, data.monthlyNotes, selectedYear, currentYear, currentMonth]);
 
   const maxTotal = Math.max(...monthsData.map((m) => m.total), 1);
 
@@ -94,6 +95,11 @@ export default function PreviousSpendings() {
                 + Dodaj troškove
               </div>
             ) : null}
+            {note && (
+              <div className="month-card__note">
+                {note.length > 55 ? note.slice(0, 55) + '…' : note}
+              </div>
+            )}
           </div>
         ))}
       </div>

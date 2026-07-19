@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../App.jsx';
 import {
   getExpensesForMonth, getTotalAmount, formatAmount,
@@ -31,12 +31,23 @@ function sortExpenses(expenses, sort) {
 }
 
 export default function MonthView({ year, month, isCurrent }) {
-  const { data, navigateTo } = useApp();
+  const { data, navigateTo, setMonthlyNote } = useApp();
   const [adding, setAdding] = useState(false);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('date-desc');
   const [showCharts, setShowCharts] = useState(false);
   const chartsRef = useRef(null);
+  const [noteText, setNoteText] = useState(() => data.monthlyNotes?.[year]?.[month] ?? '');
+
+  useEffect(() => {
+    setNoteText(data.monthlyNotes?.[year]?.[month] ?? '');
+  }, [data.monthlyNotes, year, month]);
+
+  const handleNoteBlur = useCallback(() => {
+    const trimmed = noteText.trim();
+    const current = data.monthlyNotes?.[year]?.[month] ?? '';
+    if (trimmed !== current) setMonthlyNote(year, month, trimmed);
+  }, [noteText, data.monthlyNotes, year, month, setMonthlyNote]);
 
   useEffect(() => {
     if (showCharts && chartsRef.current) {
@@ -122,6 +133,17 @@ export default function MonthView({ year, month, isCurrent }) {
             <div className="stat-card__delta">{formatAmount(topCategory[1])}</div>
           )}
         </div>
+      </div>
+
+      <div className="month-note">
+        <textarea
+          className="month-note__input"
+          placeholder="Napomena za ovaj mesec..."
+          value={noteText}
+          onChange={(e) => setNoteText(e.target.value)}
+          onBlur={handleNoteBlur}
+          rows={2}
+        />
       </div>
 
       <BudgetPanel year={year} month={month} />

@@ -51,9 +51,47 @@ Realizovana uz pomoć Claude AI-ja.
 - Dugme 🌙 / ☀️ u navigaciji trenutno menja temu
 - Podešavanje se čuva u browseru odvojeno od podataka o troškovima — ne briše se uvozom JSON fajla i preživljava osvežavanje stranice
 
+### Ponavljajući troškovi
+
+- Checkbox "Ponavljajući trošak" u formi za dodavanje troška
+- Kada je označen, trošak se čuva kao **šablon** u posebnoj listi, a ne kao jednokratni unos
+- Aplikacija automatski generiše po jedan unos **za svaki mesec** od datuma početka do tekućeg meseca, preskačući mesece u kojima unos već postoji
+- Ponavljajući troškovi su označeni ikonom 🔄 u listi
+- Upravljanje šablonima (brisanje) dostupno na početnoj strani — brisanje šablona ne uklanja prošle unesene troškove
+
+### Globalna pretraga
+
+- Dugme 🔍 u navigaciji otvara pretragu svih troškova
+- Pretraga po **nazivu**, **kategoriji** i **napomeni**, bez obzira na mesec
+- Rezultati sortirani od najnovijeg; klik na rezultat vodi direktno u prikaz tog meseca
+
+### Autosave u fajl
+
+- Opcija čuvanja svih podataka u JSON fajl na disku (File System Access API)
+- Nakon jednokratnog podešavanja, svaka izmena se automatski upisuje u fajl
+- Fajl se čita samo ako je localStorage obrisan (režim oporavka) — localStorage je uvek primarni izvor
+- Status autosave-a vidljiv je u navigaciji: **Podesi** → **Aktiviraj** → 💾 (aktivno) / ! (greška)
+
+### Napomena za mesec
+
+- Slobodan tekst koji se dodaje svakom mesecu — polje za unos je na vrhu pregleda meseca, iznad budget panela
+- Čuva se automatski na gubitak fokusa
+- Skraćeni prikaz napomene (do 55 znakova) vidljiv je na kartici meseca u pregledu prethodnih potrošnji — korisno za razumevanje skokova na grafikonu bez otvaranja meseca
+
+### Ciljevi štednje
+
+- Definisanje cilja sa **nazivom** i **ciljnom sumom (RSD)**
+- Opciono povezivanje sa **budžetskim fondom** za određenu godinu — napredak se automatski izračunava kao zbir svih mesečnih alokacija u tom fondu
+- Progress bar sa bojama: sivo (0%) → narandžasto (1–59%) → indigo (60–99%) → zeleno (100%)
+- Ciljevi bez fonda prikazuju 0 / cilj kao ručni podsetnik
+- Brisanje cilja zahteva dvostruki klik (potvrda)
+- Prikazano na početnoj strani ispod ponavljajućih troškova
+
 ### Uvoz i izvoz
-- **Izvezi JSON** — preuzimanje kompletnih podataka (troškovi + kategorije + budžet + podešavanja praćenja) u jedan JSON fajl, pogodno za analizu u Claude AI
-- **Uvezi JSON** — učitavanje prethodno izvezenih podataka; obnavlja sve uključujući podešavanja praćenja — dovoljan je jedan fajl nakon brisanja browsera
+
+- **Izvezi JSON** — preuzimanje kompletnih podataka (troškovi + kategorije + budžet + praćenje + napomene + ciljevi) u jedan JSON fajl, pogodno za analizu u Claude AI
+- **Izvezi CSV (Excel)** — isti podaci u CSV formatu sa UTF-8 BOM, otvara se direktno u Excelu bez čarobnjaka za uvoz; kolone: Datum, Naziv, Iznos, Kategorija, Napomena, Ponavljajuci
+- **Uvezi JSON** — učitavanje prethodno izvezenih podataka; obnavlja sve — dovoljan je jedan fajl nakon brisanja browsera
 - **Izvezi budžet** — izvoz samo budžet podataka u poseban fajl (`budget-YYYY.json`)
 - **Uvezi budžet** — učitavanje budžeta iz fajla; spaja po godini, ne briše postojeće podatke
 
@@ -66,7 +104,9 @@ Realizovana uz pomoć Claude AI-ja.
 | React 18 | UI framework |
 | Vite 5 | Build alat |
 | Recharts | Grafici |
-| localStorage | Čuvanje podataka |
+| @dnd-kit | Drag-to-reorder fondova u budžetu |
+| Vitest + @testing-library/react | Test suite (97 testova, 7 fajlova) |
+| localStorage + File System Access API | Čuvanje podataka |
 
 ---
 
@@ -74,16 +114,11 @@ Realizovana uz pomoć Claude AI-ja.
 
 ```bash
 npm install
-npm run dev
+npm run dev        # dev server na http://localhost:5173
+npm run build      # produkcijski build → dist/
+npm test           # pokreni sve testove jednom
+npm run test:watch # watch mode
 ```
-
-Aplikacija se otvara na `http://localhost:5173`.
-
-```bash
-npm run build
-```
-
-Generiše produkcijski build u `dist/` folderu.
 
 ---
 
@@ -92,22 +127,29 @@ Generiše produkcijski build u `dist/` folderu.
 ```
 src/
 ├── components/
-│   ├── BudgetPanel.jsx      # Panel za praćenje budžeta unutar prikaza meseca
-│   ├── BudgetView.jsx       # Godišnji budžet — tabela prihoda i rashoda
-│   ├── CategoryManager.jsx  # Upravljanje kategorijama
-│   ├── Charts.jsx           # Pita i bar grafici
-│   ├── ExpenseItem.jsx      # Jedan red troška
-│   ├── ExpenseModal.jsx     # Modal za dodavanje/izmenu troška
-│   ├── Header.jsx           # Navigacija
-│   ├── Home.jsx             # Početna strana
-│   ├── MonthView.jsx        # Pregled troškova za mesec
-│   ├── PreviousSpendings.jsx# Navigacija po prethodnim mesecima
-│   └── TrackingSetup.jsx    # Podešavanje praćenja budžeta po fondovima
+│   ├── BudgetPanel.jsx       # Panel za praćenje budžeta unutar prikaza meseca
+│   ├── BudgetView.jsx        # Godišnji budžet — tabela prihoda i rashoda
+│   ├── CategoryManager.jsx   # Upravljanje kategorijama
+│   ├── Charts.jsx            # Pita i bar grafici
+│   ├── ExpenseItem.jsx       # Jedan red troška
+│   ├── ExpenseModal.jsx      # Modal za dodavanje/izmenu troška (+ ponavljajući)
+│   ├── GlobalSearch.jsx      # Pretraga svih troškova
+│   ├── Header.jsx            # Navigacija
+│   ├── Home.jsx              # Početna strana
+│   ├── MonthView.jsx         # Pregled troškova za mesec (+ napomena)
+│   ├── PreviousSpendings.jsx # Navigacija po prethodnim mesecima
+│   ├── SavingsGoals.jsx      # Ciljevi štednje sa progress barovima
+│   └── TrackingSetup.jsx     # Podešavanje praćenja budžeta po fondovima
+├── __tests__/                # 97 testova u 7 fajlova (Vitest)
+├── test/
+│   └── setup.js              # jest-dom matchers, localStorage reset
 ├── utils/
-│   ├── helpers.js           # Formatiranje, filtriranje, konstante
-│   └── storage.js           # localStorage, uvoz/izvoz JSON
-├── App.jsx                  # Globalni state i routing
-└── index.css                # Svi stilovi
+│   ├── dataTransforms.js     # Čiste funkcije: generisanje ponavljajućih, kopija budžeta
+│   ├── fileStorage.js        # IndexedDB + File System Access API
+│   ├── helpers.js            # Formatiranje, filtriranje, konstante
+│   └── storage.js            # localStorage, uvoz/izvoz JSON i CSV
+├── App.jsx                   # Globalni state, Context, sve akcije
+└── index.css                 # Svi stilovi (BEM, CSS varijable, dark mode)
 ```
 
 ---
