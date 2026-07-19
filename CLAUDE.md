@@ -24,7 +24,7 @@ Test files live in `src/__tests__/`. Setup file is `src/test/setup.js` (clears l
 
 **Test workflow:** For every new feature or edit, write tests in the relevant file(s) before reporting done, then run `npm test` to confirm nothing is broken. If a new pure utility is added, test it in the helpers or dataTransforms suite. If a new component is added, add a `.test.jsx` file for it.
 
-**Current test files (127 tests, 11 files):**
+**Current test files (139 tests, 12 files):**
 - `helpers.test.js` — all pure functions in `utils/helpers.js`
 - `storage.test.js` — `loadData`, `saveData`, `importJSON`, `importBudget`, `buildCSVString`
 - `dataTransforms.test.js` — `generateRecurringExpenses`, `applyBudgetCopy`
@@ -32,10 +32,11 @@ Test files live in `src/__tests__/`. Setup file is `src/test/setup.js` (clears l
 - `ExpenseModal.test.jsx` — add/edit/recurring flows, validation
 - `MonthView.test.jsx` — back navigation via prevView, monthly note textarea
 - `SavingsGoals.test.jsx` — empty state, add form, progress calculation, two-click delete
-- `Header.test.jsx` — Prethodne button render/active states, theme toggle
+- `Header.test.jsx` — Praćenje absent, Prethodne button render/active states, theme toggle
 - `Home.test.jsx` — quick-add circle button, modal open/close, removed Prethodne card
 - `BudgetPanel.test.jsx` — null render, fund rows, amounts, remaining, "nije postavljeno"
 - `PreviousSpendings.test.jsx` — 12-card grid, note snippet, truncation, empty state
+- `BudgetView.test.jsx` — category chip render/count, inline panel expand/collapse, one-at-a-time, pill add/remove calls
 
 **Context wrapper for component tests:** Import `AppContext` from `App.jsx` and wrap with `<AppContext.Provider value={mockCtx}>`. The mock context needs `data`, `navigateTo`, and whichever action callbacks the component uses — see existing test files for the pattern.
 
@@ -96,17 +97,15 @@ When adding new top-level fields to the data shape, backfill them in three place
 | `month` | `MonthView` (selectedYear/selectedMonth) |
 | `categories` | `CategoryManager.jsx` |
 | `budget` | `BudgetView.jsx` |
-| `tracking` | `TrackingSetup.jsx` |
 | `search` | `GlobalSearch.jsx` |
 
 ### Key component notes
 
-- **`Header.jsx`** — nav is split into two groups by thin `.header__sep` dividers: primary (Početna, Prethodne, 🔍) and tools (Budžet, Praćenje, Kategorije), followed by autosave status and theme toggle. "Prethodne" is active for both `view === 'previous'` and `view === 'month'`.
+- **`Header.jsx`** — nav is split into two groups by thin `.header__sep` dividers: primary (Početna, Prethodne, 🔍) and tools (Budžet, Kategorije), followed by autosave status and theme toggle. "Prethodne" is active for both `view === 'previous'` and `view === 'month'`. There is no separate Praćenje nav item — tracking is inline in BudgetView.
 - **`Home.jsx`** — hero row has the greeting text centered and a circular `+` button (`home__add-btn`) positioned `absolute; right: 0` so it doesn't shift the centered text. Clicking opens `ExpenseModal` with today's date via local `adding` state — the modal is managed in Home, not App. The "Pogledaj prethodne potrošnje" action card was removed (superseded by the Prethodne nav button). Renders `SavingsGoals` at the bottom.
 - **`BudgetPanel.jsx`** — renders inside `MonthView` above the expense list; shows live fund vs. actual spend as compact single-column rows (`bp-row`): dot indicator | fund name | progress bar | spent/allocated | remaining. Returns null if no funds have tracking categories mapped.
-- **`BudgetView.jsx`** — year is local state (‹/› nav buttons); `currentMonth` highlight only applies for the actual current year. "📋 Kopiraj u {year+1}" copies fund structure + plata income + tracking category links to the next year (double-click confirmation if target already has data). `copyBudgetToYear` in App.jsx assigns new fund IDs and remaps `trackingMaps`.
+- **`BudgetView.jsx`** — year is local state (‹/› nav buttons); `currentMonth` highlight only applies for the actual current year. "📋 Kopiraj u {year+1}" copies fund structure + plata income + tracking category links to the next year (double-click confirmation if target already has data). `copyBudgetToYear` in App.jsx assigns new fund IDs and remaps `trackingMaps`. Each fund row has a **📂 chip** (shows mapped-category count) that expands an inline tracking panel directly below the row; only one panel can be open at a time; panel hides during drag. The chip and panel are rendered inside `SortableFundRow` as a React Fragment — the `setNodeRef` (DnD target) attaches to the first `<tr>`, the panel is a second sibling `<tr>`. Flex containers inside `<td>` require explicit `width: 100%` and `flex: 1; min-width: 0` on inner flex children to wrap correctly in table layout.
 - **`Charts.jsx`** — rendered above the expense list when toggled; pie chart for category breakdown, bar chart for month comparison.
-- **`TrackingSetup.jsx`** — maps budget fund IDs to expense category names; auto-saves on every pill toggle.
 - **`GlobalSearch.jsx`** — searches across all expenses (title, category, note), sorted by date desc; clicking a result navigates to that month's MonthView.
 - **`SavingsGoals.jsx`** — savings goal list with progress bars; progress = sum of all non-null amounts in the linked budget fund for the linked year. Goal year select defaults to the most recent budget year that exists. Delete requires two clicks.
 - **`MonthView.jsx`** — includes a monthly-note textarea between the stats row and BudgetPanel; saves on blur only when text has changed.
