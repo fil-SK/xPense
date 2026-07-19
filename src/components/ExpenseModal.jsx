@@ -1,6 +1,98 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { todayISO, CHART_COLORS } from '../utils/helpers.js';
 import { useApp } from '../App.jsx';
+
+function CategoryGroupPicker({ categories, groups, selected, onSelect, hasError }) {
+  const colorIndex = useMemo(
+    () => Object.fromEntries(categories.map((c, i) => [c, i])),
+    [categories]
+  );
+
+  const selectedGroupId = useMemo(
+    () => groups.find((g) => g.categories.includes(selected))?.id ?? '__ungrouped__',
+    [groups, selected]
+  );
+
+  const [openIds, setOpenIds] = useState(() => new Set([selectedGroupId]));
+
+  useEffect(() => {
+    setOpenIds((prev) => new Set([...prev, selectedGroupId]));
+  }, [selectedGroupId]);
+
+  function toggleOpen(id) {
+    setOpenIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const groupedNames = useMemo(
+    () => new Set(groups.flatMap((g) => g.categories)),
+    [groups]
+  );
+  const ungrouped = categories.filter((c) => !groupedNames.has(c));
+
+  const sections = [
+    ...groups
+      .map((g) => ({ id: g.id, name: g.name, cats: g.categories.filter((c) => categories.includes(c)) }))
+      .filter((s) => s.cats.length > 0),
+    ...(ungrouped.length > 0 ? [{ id: '__ungrouped__', name: 'Opšte', cats: ungrouped }] : []),
+  ];
+
+  function renderPills(cats) {
+    return (
+      <div className="cgp-pills">
+        {cats.map((c) => {
+          const color = CHART_COLORS[(colorIndex[c] ?? 0) % CHART_COLORS.length];
+          const active = selected === c;
+          return (
+            <button
+              key={c}
+              type="button"
+              className="cat-pill"
+              style={
+                active
+                  ? { background: color, borderColor: color, color: '#fff' }
+                  : { background: color + '18', borderColor: color + '70', color }
+              }
+              onClick={() => onSelect(c)}
+            >
+              {c}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`cgp ${hasError ? 'cgp--error' : ''}`}>
+      {sections.map((section) => {
+        const isOpen = openIds.has(section.id);
+        const hasSelected = section.cats.includes(selected);
+        return (
+          <div key={section.id} className={`cgp-card ${isOpen ? 'cgp-card--open' : ''} ${hasSelected ? 'cgp-card--selected' : ''}`}>
+            <button type="button" className="cgp-card__header" onClick={() => toggleOpen(section.id)}>
+              <span className="cgp-card__arrow">{isOpen ? '▾' : '▸'}</span>
+              <span className="cgp-card__name">{section.name}</span>
+              {hasSelected && !isOpen && (
+                <span className="cgp-card__sel-badge">{selected}</span>
+              )}
+              <span className="cgp-card__count">{section.cats.length}</span>
+            </button>
+            <div className="cgp-card__body">
+              <div className="cgp-card__inner">
+                {renderPills(section.cats)}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function ExpenseModal({ expense, defaultDate, onClose }) {
   const { data, addExpense, updateExpense, addRecurring } = useApp();
@@ -9,7 +101,7 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
   const [form, setForm] = useState(
     isEdit
       ? { title: expense.title, date: expense.date, amount: String(expense.amount), category: expense.category, note: expense.note ?? '' }
-      : { title: '', date: defaultDate ?? todayISO(), amount: '', category: data.categories[0] ?? '', note: '' }
+      : { title: '', date: defaultDate ?? todayISO(), amount: '', category: '', note: '' }
   );
   const [errors, setErrors] = useState({});
   const [recurring, setRecurring] = useState(false);
@@ -54,6 +146,8 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
     }
     onClose();
   }
+
+  const hasGroups = (data.categoryGroups?.length ?? 0) > 0;
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -102,27 +196,37 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
 
         <div className="form-group">
           <label className="form-label">Kategorija</label>
-          <div className={`cat-pills ${errors.category ? 'cat-pills--error' : ''}`}>
-            {data.categories.map((c, i) => {
-              const color = CHART_COLORS[i % CHART_COLORS.length];
-              const active = form.category === c;
-              return (
-                <button
-                  key={c}
-                  type="button"
-                  className="cat-pill"
-                  style={
-                    active
-                      ? { background: color, borderColor: color, color: '#fff' }
-                      : { background: color + '18', borderColor: color + '70', color }
-                  }
-                  onClick={() => set('category', c)}
-                >
-                  {c}
-                </button>
-              );
-            })}
-          </div>
+          {hasGroups ? (
+            <CategoryGroupPicker
+              categories={data.categories}
+              groups={data.categoryGroups}
+              selected={form.category}
+              onSelect={(c) => set('category', c)}
+              hasError={!!errors.category}
+            />
+          ) : (
+            <div className={`cat-pills ${errors.category ? 'cat-pills--error' : ''}`}>
+              {data.categories.map((c, i) => {
+                const color = CHART_COLORS[i % CHART_COLORS.length];
+                const active = form.category === c;
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    className="cat-pill"
+                    style={
+                      active
+                        ? { background: color, borderColor: color, color: '#fff' }
+                        : { background: color + '18', borderColor: color + '70', color }
+                    }
+                    onClick={() => set('category', c)}
+                  >
+                    {c}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {errors.category && <span className="form-error">{errors.category}</span>}
         </div>
 
@@ -137,21 +241,22 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
         </div>
 
         {!isEdit && (
-          <div className="form-group">
-            <label className="form-check">
-              <input
-                type="checkbox"
-                checked={recurring}
-                onChange={(e) => setRecurring(e.target.checked)}
-              />
-              <span>Ponavljajući trošak — automatski svaki mesec</span>
-            </label>
+          <div className="form-recurring">
+            <button
+              type="button"
+              aria-label="Ponavljajući trošak"
+              className={`btn-recurring ${recurring ? 'btn-recurring--active' : ''}`}
+              onClick={() => setRecurring((v) => !v)}
+            >
+              🔁
+            </button>
+            <span className="form-recurring__label">ponavljajući trošak - automatski svaki mesec</span>
           </div>
         )}
 
         <div className="modal__footer">
           <button className="btn btn--ghost" onClick={onClose}>Otkaži</button>
-          <button className="btn btn--primary" onClick={handleSubmit}>
+          <button className="btn btn--primary" onClick={handleSubmit} disabled={!form.category}>
             {isEdit ? 'Sačuvaj izmene' : 'Dodaj trošak'}
           </button>
         </div>

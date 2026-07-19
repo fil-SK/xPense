@@ -16,7 +16,7 @@ const DEFAULT_CATEGORIES = [
 export function loadData() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { expenses: [], categories: [...DEFAULT_CATEGORIES], budget: {}, trackingMaps: {}, recurrings: [], monthlyNotes: {}, savingsGoals: [] };
+    if (!raw) return { expenses: [], categories: [...DEFAULT_CATEGORIES], budget: {}, trackingMaps: {}, recurrings: [], monthlyNotes: {}, savingsGoals: [], categoryGroups: [] };
     const parsed = JSON.parse(raw);
     return {
       expenses: parsed.expenses ?? [],
@@ -26,9 +26,10 @@ export function loadData() {
       recurrings: parsed.recurrings ?? [],
       monthlyNotes: parsed.monthlyNotes ?? {},
       savingsGoals: parsed.savingsGoals ?? [],
+      categoryGroups: parsed.categoryGroups ?? [],
     };
   } catch {
-    return { expenses: [], categories: [...DEFAULT_CATEGORIES], budget: {}, trackingMaps: {}, recurrings: [], monthlyNotes: {}, savingsGoals: [] };
+    return { expenses: [], categories: [...DEFAULT_CATEGORIES], budget: {}, trackingMaps: {}, recurrings: [], monthlyNotes: {}, savingsGoals: [], categoryGroups: [] };
   }
 }
 
@@ -63,6 +64,9 @@ export function importJSON(file) {
           budget: parsed.budget ?? {},
           trackingMaps: parsed.trackingMaps ?? {},
           recurrings: parsed.recurrings ?? [],
+          monthlyNotes: parsed.monthlyNotes ?? {},
+          savingsGoals: parsed.savingsGoals ?? [],
+          categoryGroups: parsed.categoryGroups ?? [],
         });
       } catch {
         reject(new Error('Neispravan JSON fajl.'));

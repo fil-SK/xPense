@@ -35,9 +35,9 @@ describe('ExpenseModal — add mode', () => {
     expect(screen.getByRole('button', { name: /dodaj trošak/i })).toBeInTheDocument();
   });
 
-  test('shows recurring checkbox only in add mode', () => {
+  test('shows recurring toggle button only in add mode', () => {
     renderModal();
-    expect(screen.getByRole('checkbox')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /ponavljajući trošak/i })).toBeInTheDocument();
     expect(screen.getByText(/ponavljajući trošak/i)).toBeInTheDocument();
   });
 
@@ -46,6 +46,7 @@ describe('ExpenseModal — add mode', () => {
     const { addExpense, onClose } = renderModal();
     await user.type(screen.getByPlaceholderText(/npr/i), 'Kafa');
     await user.type(screen.getByRole('spinbutton'), '350');
+    await user.click(screen.getByRole('button', { name: 'Hrana' }));
     await user.click(screen.getByRole('button', { name: /dodaj trošak/i }));
     expect(addExpense).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Kafa', amount: 350, category: 'Hrana' })
@@ -53,12 +54,13 @@ describe('ExpenseModal — add mode', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  test('calls addRecurring (not addExpense) when recurring checkbox is checked', async () => {
+  test('calls addRecurring (not addExpense) when recurring button is toggled', async () => {
     const user = userEvent.setup();
     const { addExpense, addRecurring } = renderModal();
     await user.type(screen.getByPlaceholderText(/npr/i), 'Netflix');
     await user.type(screen.getByRole('spinbutton'), '800');
-    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: 'Hrana' }));
+    await user.click(screen.getByRole('button', { name: /ponavljajući trošak/i }));
     await user.click(screen.getByRole('button', { name: /dodaj trošak/i }));
     expect(addRecurring).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Netflix', amount: 800, frequency: 'monthly' })
@@ -66,9 +68,22 @@ describe('ExpenseModal — add mode', () => {
     expect(addExpense).not.toHaveBeenCalled();
   });
 
-  test('shows validation errors on empty submit', async () => {
+  test('submit button is disabled until a category is selected', () => {
+    renderModal();
+    expect(screen.getByRole('button', { name: /dodaj trošak/i })).toBeDisabled();
+  });
+
+  test('submit button enables after selecting a category', async () => {
+    const user = userEvent.setup();
+    renderModal();
+    await user.click(screen.getByRole('button', { name: 'Hrana' }));
+    expect(screen.getByRole('button', { name: /dodaj trošak/i })).not.toBeDisabled();
+  });
+
+  test('shows validation errors on submit with category but empty title and amount', async () => {
     const user = userEvent.setup();
     const { addExpense } = renderModal();
+    await user.click(screen.getByRole('button', { name: 'Hrana' }));
     await user.click(screen.getByRole('button', { name: /dodaj trošak/i }));
     expect(screen.getByText(/naslov je obavezan/i)).toBeInTheDocument();
     expect(screen.getByText(/unesite ispravan iznos/i)).toBeInTheDocument();
@@ -78,6 +93,7 @@ describe('ExpenseModal — add mode', () => {
   test('shows amount error for zero amount', async () => {
     const user = userEvent.setup();
     renderModal();
+    await user.click(screen.getByRole('button', { name: 'Hrana' }));
     await user.type(screen.getByPlaceholderText(/npr/i), 'Test');
     await user.type(screen.getByRole('spinbutton'), '0');
     await user.click(screen.getByRole('button', { name: /dodaj trošak/i }));
@@ -101,6 +117,7 @@ describe('ExpenseModal — add mode', () => {
   test('trims whitespace from title before saving', async () => {
     const user = userEvent.setup();
     const { addExpense } = renderModal();
+    await user.click(screen.getByRole('button', { name: 'Hrana' }));
     await user.type(screen.getByPlaceholderText(/npr/i), '  Kafa  ');
     await user.type(screen.getByRole('spinbutton'), '100');
     await user.click(screen.getByRole('button', { name: /dodaj trošak/i }));
@@ -110,6 +127,7 @@ describe('ExpenseModal — add mode', () => {
   test('rounds non-integer amounts', async () => {
     const user = userEvent.setup();
     const { addExpense } = renderModal();
+    await user.click(screen.getByRole('button', { name: 'Hrana' }));
     await user.type(screen.getByPlaceholderText(/npr/i), 'Roba');
     await user.type(screen.getByRole('spinbutton'), '99.9');
     await user.click(screen.getByRole('button', { name: /dodaj trošak/i }));
@@ -137,9 +155,9 @@ describe('ExpenseModal — edit mode', () => {
     expect(screen.getByDisplayValue('neka napomena')).toBeInTheDocument();
   });
 
-  test('does not show recurring checkbox in edit mode', () => {
+  test('does not show recurring button in edit mode', () => {
     renderModal(existingExpense);
-    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /ponavljajući trošak/i })).not.toBeInTheDocument();
   });
 
   test('calls updateExpense (not addExpense) on save', async () => {
@@ -161,5 +179,67 @@ describe('ExpenseModal — edit mode', () => {
     await user.click(screen.getByRole('button', { name: /sačuvaj izmene/i }));
     expect(screen.getByText(/naslov je obavezan/i)).toBeInTheDocument();
     expect(updateExpense).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Category group picker ────────────────────────────────────────────────────
+
+const GROUPED_CTX = {
+  data: {
+    expenses: [],
+    categories: ['Hrana', 'Gorivo', 'Netflix'],
+    categoryGroups: [
+      { id: 'g1', name: 'Namirnice', categories: ['Hrana'] },
+      { id: 'g2', name: 'Auto', categories: ['Gorivo'] },
+    ],
+  },
+};
+
+describe('ExpenseModal — category group picker', () => {
+  test('shows group card headers when categoryGroups exist', () => {
+    renderModal(undefined, GROUPED_CTX);
+    expect(screen.getByRole('button', { name: /namirnice/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /auto/i })).toBeInTheDocument();
+  });
+
+  test('shows Opšte section for categories not in any group', () => {
+    renderModal(undefined, GROUPED_CTX);
+    expect(screen.getByRole('button', { name: /opšte/i })).toBeInTheDocument();
+  });
+
+  test('auto-expands group containing the default selected category', () => {
+    renderModal(undefined, GROUPED_CTX);
+    // Hrana is the first category and is in Namirnice; its pill should be visible
+    expect(screen.getByRole('button', { name: 'Hrana' })).toBeInTheDocument();
+  });
+
+  test('clicking a collapsed group header expands it to show pills', async () => {
+    const user = userEvent.setup();
+    renderModal(undefined, GROUPED_CTX);
+    // Auto is collapsed initially (Gorivo is not the default selection)
+    await user.click(screen.getByRole('button', { name: /auto/i }));
+    expect(screen.getByRole('button', { name: 'Gorivo' })).toBeInTheDocument();
+  });
+
+  test('selecting a pill sets the category and keeps the group open', async () => {
+    const user = userEvent.setup();
+    const { addExpense } = renderModal(undefined, GROUPED_CTX);
+    // Expand Auto group
+    await user.click(screen.getByRole('button', { name: /auto/i }));
+    await user.click(screen.getByRole('button', { name: 'Gorivo' }));
+    // Group stays open (Gorivo pill still visible)
+    expect(screen.getByRole('button', { name: 'Gorivo' })).toBeInTheDocument();
+    // Submit and verify category
+    await user.type(screen.getByPlaceholderText(/npr/i), 'Benzin');
+    await user.type(screen.getByRole('spinbutton'), '5000');
+    await user.click(screen.getByRole('button', { name: /dodaj trošak/i }));
+    expect(addExpense).toHaveBeenCalledWith(expect.objectContaining({ category: 'Gorivo' }));
+  });
+
+  test('falls back to flat pills when categoryGroups is empty', () => {
+    renderModal();
+    // In the default renderModal, data has no categoryGroups → flat pills rendered directly
+    expect(screen.getByRole('button', { name: 'Hrana' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Transport' })).toBeInTheDocument();
   });
 });

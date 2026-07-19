@@ -24,6 +24,7 @@ describe('loadData', () => {
       recurrings: [],
       monthlyNotes: { 2025: { 2: 'Skupo zbog auta' } },
       savingsGoals: [{ id: 'g1', name: 'Odmor', target: 100000, fundId: null, year: null }],
+      categoryGroups: [],
     };
     localStorage.setItem(KEY, JSON.stringify(stored));
     expect(loadData()).toEqual(stored);
@@ -70,6 +71,7 @@ describe('saveData / loadData roundtrip', () => {
       recurrings: [{ id: 'r1', title: 'Netflix', amount: 800, category: 'Zabava', startDate: '2025-01-01', frequency: 'monthly' }],
       monthlyNotes: { 2025: { 2: 'Auto servis' } },
       savingsGoals: [{ id: 'g1', name: 'Odmor', target: 50000, fundId: null, year: null }],
+      categoryGroups: [],
     };
     saveData(data);
     expect(loadData()).toEqual(data);

@@ -24,12 +24,12 @@ Test files live in `src/__tests__/`. Setup file is `src/test/setup.js` (clears l
 
 **Test workflow:** For every new feature or edit, write tests in the relevant file(s) before reporting done, then run `npm test` to confirm nothing is broken. If a new pure utility is added, test it in the helpers or dataTransforms suite. If a new component is added, add a `.test.jsx` file for it.
 
-**Current test files (139 tests, 12 files):**
+**Current test files (169 tests, 13 files):**
 - `helpers.test.js` — all pure functions in `utils/helpers.js`
 - `storage.test.js` — `loadData`, `saveData`, `importJSON`, `importBudget`, `buildCSVString`
 - `dataTransforms.test.js` — `generateRecurringExpenses`, `applyBudgetCopy`
 - `GlobalSearch.test.jsx` — rendering, search filtering, navigation callbacks
-- `ExpenseModal.test.jsx` — add/edit/recurring flows, validation
+- `ExpenseModal.test.jsx` — add/edit/recurring flows, validation; submit disabled until category selected; group card picker (auto-expand, pill select, flat-pill fallback)
 - `MonthView.test.jsx` — back navigation via prevView, monthly note textarea
 - `SavingsGoals.test.jsx` — empty state, add form, progress calculation, two-click delete
 - `Header.test.jsx` — Praćenje absent, Prethodne button render/active states, theme toggle
@@ -37,6 +37,7 @@ Test files live in `src/__tests__/`. Setup file is `src/test/setup.js` (clears l
 - `BudgetPanel.test.jsx` — null render, fund rows, amounts, remaining, "nije postavljeno"
 - `PreviousSpendings.test.jsx` — 12-card grid, note snippet, truncation, empty state
 - `BudgetView.test.jsx` — category chip render/count, inline panel expand/collapse, one-at-a-time, pill add/remove calls
+- `CategoryManager.test.jsx` — archive vs delete two-choice confirm, usage count, rename, add, duplicate guard; Grupe tab (add/delete group, expand + checkboxes, membership toggle, rename, cross-group hint)
 
 **Context wrapper for component tests:** Import `AppContext` from `App.jsx` and wrap with `<AppContext.Provider value={mockCtx}>`. The mock context needs `data`, `navigateTo`, and whichever action callbacks the component uses — see existing test files for the pattern.
 
@@ -53,6 +54,7 @@ The full data object shape:
 {
   expenses: [{ id, date, amount, category, title, note, recurringId? }],
   categories: [string],
+  categoryGroups: [{ id, name, categories: [string] }],
   budget: {
     [year]: {
       income: { plata: [12 values], bonus: [12 values] },
@@ -79,7 +81,7 @@ Two layers, both managed in `App.jsx`:
 `src/utils/storage.js` handles localStorage read/write, JSON import/export, and CSV export (`buildCSVString` + `exportCSV`). The BOM prefix in `exportCSV` ensures Excel opens the file with correct UTF-8 encoding.
 `src/utils/fileStorage.js` handles IndexedDB handle storage and File System Access API read/write.
 
-When adding new top-level fields to the data shape, backfill them in three places: the empty-localStorage return in `loadData()`, the parsed-JSON return in `loadData()`, and the file-recovery `setData` call in `App.jsx`.
+When adding new top-level fields to the data shape, backfill them in four places: the empty-localStorage return in `loadData()`, the parsed-JSON return in `loadData()`, the error-catch return in `loadData()`, and the file-recovery `setData` call in `App.jsx`. Also update `importJSON` to pass the field through. See `categoryGroups` as the reference example.
 
 ### Navigation and prevView
 
@@ -105,6 +107,8 @@ When adding new top-level fields to the data shape, backfill them in three place
 - **`Home.jsx`** — hero row has the greeting text centered and a circular `+` button (`home__add-btn`) positioned `absolute; right: 0` so it doesn't shift the centered text. Clicking opens `ExpenseModal` with today's date via local `adding` state — the modal is managed in Home, not App. The "Pogledaj prethodne potrošnje" action card was removed (superseded by the Prethodne nav button). Renders `SavingsGoals` at the bottom.
 - **`BudgetPanel.jsx`** — renders inside `MonthView` above the expense list; shows live fund vs. actual spend as compact single-column rows (`bp-row`): dot indicator | fund name | progress bar | spent/allocated | remaining. Returns null if no funds have tracking categories mapped.
 - **`BudgetView.jsx`** — year is local state (‹/› nav buttons); `currentMonth` highlight only applies for the actual current year. "📋 Kopiraj u {year+1}" copies fund structure + plata income + tracking category links to the next year (double-click confirmation if target already has data). `copyBudgetToYear` in App.jsx assigns new fund IDs and remaps `trackingMaps`. Each fund row has a **📂 chip** (shows mapped-category count) that expands an inline tracking panel directly below the row; only one panel can be open at a time; panel hides during drag. The chip and panel are rendered inside `SortableFundRow` as a React Fragment — the `setNodeRef` (DnD target) attaches to the first `<tr>`, the panel is a second sibling `<tr>`. Flex containers inside `<td>` require explicit `width: 100%` and `flex: 1; min-width: 0` on inner flex children to wrap correctly in table layout.
+- **`CategoryManager.jsx`** — two-tab interface: **Kategorije** (flat list with archive/delete/rename/add, same as before) and **Grupe** (group management). In the Kategorije tab, the 🗑️ button expands into two choices: **Arhiviraj** (removes name from `data.categories` only, expenses unchanged) and **Obriši** (removes and reassigns all matching expenses to "Ostalo"), wired to `archiveCategory` and `deleteCategory`. In the Grupe tab, each group row has a header (click to expand) that reveals checkboxes for all categories — checked = in this group. Checking a category auto-removes it from any other group it was in. `data-testid="group-{id}"` is on each group row for test scoping with `within()`. Group actions: `addCategoryGroup`, `renameCategoryGroup`, `deleteCategoryGroup`, `updateCategoryGroupMembers`. All category mutation actions (`deleteCategory`, `archiveCategory`, `updateCategory`) sync `categoryGroups` automatically.
+- **`ExpenseModal.jsx`** — form starts with `category: ''`; the submit button is `disabled={!form.category}` so the user must pick a category before saving. Category picker renders as expandable group cards (`CategoryGroupPicker` inline component) when `data.categoryGroups` is non-empty: cards expand/collapse independently, the group containing the current category is auto-expanded on open, selecting a pill keeps the card open. Falls back to flat pills when no groups are configured. The recurring 🔁 toggle button uses `aria-label="Ponavljajući trošak"` (queryable in tests).
 - **`Charts.jsx`** — rendered above the expense list when toggled; pie chart for category breakdown, bar chart for month comparison.
 - **`GlobalSearch.jsx`** — searches across all expenses (title, category, note), sorted by date desc; clicking a result navigates to that month's MonthView.
 - **`SavingsGoals.jsx`** — savings goal list with progress bars; progress = sum of all non-null amounts in the linked budget fund for the linked year. Goal year select defaults to the most recent budget year that exists. Delete requires two clicks.
@@ -113,7 +117,7 @@ When adding new top-level fields to the data shape, backfill them in three place
 
 ### Recurring expenses
 
-`ExpenseModal` (add mode only) has a "Ponavljajući trošak" checkbox. When checked, submit calls `addRecurring` instead of `addExpense` — the template is stored in `data.recurrings`. A `useEffect` in `App.jsx` (dependency: `data.recurrings`) auto-generates expense entries via `setData` functional update for every month from `startDate` up to the current month, skipping any month where a matching `recurringId` entry already exists. Recurring expenses show a 🔄 badge in `ExpenseItem`.
+`ExpenseModal` (add mode only) has a 🔁 toggle button (`aria-label="Ponavljajući trošak"`) with a muted label below it. When active, submit calls `addRecurring` instead of `addExpense` — the template is stored in `data.recurrings`. A `useEffect` in `App.jsx` (dependency: `data.recurrings`) auto-generates expense entries via `setData` functional update for every month from `startDate` up to the current month, skipping any month where a matching `recurringId` entry already exists. Recurring expenses show a 🔄 badge in `ExpenseItem`.
 
 ### Pure utilities extracted for testability
 

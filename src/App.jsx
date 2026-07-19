@@ -59,6 +59,7 @@ export default function App() {
                 recurrings: fileData.recurrings ?? [],
                 monthlyNotes: fileData.monthlyNotes ?? {},
                 savingsGoals: fileData.savingsGoals ?? [],
+                categoryGroups: fileData.categoryGroups ?? [],
               });
             }
           } catch { }
@@ -160,7 +161,11 @@ export default function App() {
 
   const updateCategory = useCallback((oldName, newName) => {
     setData((d) => ({
+      ...d,
       categories: d.categories.map((c) => (c === oldName ? newName : c)),
+      categoryGroups: (d.categoryGroups ?? []).map((g) => ({
+        ...g, categories: g.categories.map((c) => (c === oldName ? newName : c)),
+      })),
       expenses: d.expenses.map((e) =>
         e.category === oldName ? { ...e, category: newName } : e
       ),
@@ -170,13 +175,60 @@ export default function App() {
 
   const deleteCategory = useCallback((name) => {
     setData((d) => ({
+      ...d,
       categories: d.categories.filter((c) => c !== name),
+      categoryGroups: (d.categoryGroups ?? []).map((g) => ({
+        ...g, categories: g.categories.filter((c) => c !== name),
+      })),
       expenses: d.expenses.map((e) =>
         e.category === name ? { ...e, category: 'Ostalo' } : e
       ),
     }));
     showToast(`Kategorija obrisana.`, 'danger');
   }, [showToast]);
+
+  const archiveCategory = useCallback((name) => {
+    setData((d) => ({
+      ...d,
+      categories: d.categories.filter((c) => c !== name),
+      categoryGroups: (d.categoryGroups ?? []).map((g) => ({
+        ...g, categories: g.categories.filter((c) => c !== name),
+      })),
+    }));
+    showToast(`Kategorija "${name}" arhivirana.`);
+  }, [showToast]);
+
+  const addCategoryGroup = useCallback((name) => {
+    setData((d) => ({
+      ...d,
+      categoryGroups: [...(d.categoryGroups ?? []), { id: crypto.randomUUID(), name, categories: [] }],
+    }));
+  }, []);
+
+  const renameCategoryGroup = useCallback((id, name) => {
+    setData((d) => ({
+      ...d,
+      categoryGroups: (d.categoryGroups ?? []).map((g) => (g.id === id ? { ...g, name } : g)),
+    }));
+  }, []);
+
+  const deleteCategoryGroup = useCallback((id) => {
+    setData((d) => ({
+      ...d,
+      categoryGroups: (d.categoryGroups ?? []).filter((g) => g.id !== id),
+    }));
+  }, []);
+
+  const updateCategoryGroupMembers = useCallback((groupId, members) => {
+    setData((d) => ({
+      ...d,
+      categoryGroups: (d.categoryGroups ?? []).map((g) =>
+        g.id === groupId
+          ? { ...g, categories: members }
+          : { ...g, categories: g.categories.filter((c) => !members.includes(c)) }
+      ),
+    }));
+  }, []);
 
   const importData = useCallback((imported) => {
     setData(imported);
@@ -329,6 +381,11 @@ export default function App() {
     addCategory,
     updateCategory,
     deleteCategory,
+    archiveCategory,
+    addCategoryGroup,
+    renameCategoryGroup,
+    deleteCategoryGroup,
+    updateCategoryGroupMembers,
     importData,
     importBudgetData,
     showToast,
