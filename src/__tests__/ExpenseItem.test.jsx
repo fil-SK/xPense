@@ -96,14 +96,29 @@ describe('ExpenseItem — nested action buttons', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  test('delete still needs two activations, and fires on the second', async () => {
+  // The two-click confirm is gone — the undo on the toast covers a misclick, so
+  // a delete is one click and the button never changes into a second state.
+  test('delete fires on the first click', async () => {
     const user = userEvent.setup();
     const { deleteExpense } = renderItem();
-    const del = screen.getByTitle('Obriši');
-    await user.click(del);
-    expect(deleteExpense).not.toHaveBeenCalled();
-    await user.click(screen.getByTitle(/klikni ponovo/i));
+    await user.click(screen.getByTitle('Obriši'));
     expect(deleteExpense).toHaveBeenCalledWith('e1');
+    expect(deleteExpense).toHaveBeenCalledTimes(1);
+  });
+
+  test('delete fires on the first Enter press', async () => {
+    const user = userEvent.setup();
+    const { deleteExpense } = renderItem();
+    screen.getByTitle('Obriši').focus();
+    await user.keyboard('{Enter}');
+    expect(deleteExpense).toHaveBeenCalledWith('e1');
+  });
+
+  test('the delete button is named after the expense, not just "🗑️"', () => {
+    renderItem();
+    expect(
+      screen.getByRole('button', { name: /obriši trošak: kafa i čaj/i })
+    ).toBeInTheDocument();
   });
 
   test('the edit button opens the modal exactly once', async () => {

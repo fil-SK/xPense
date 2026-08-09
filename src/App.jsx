@@ -59,6 +59,31 @@ export default function App() {
 
   useEffect(() => () => clearTimeout(toastTimerRef.current), []);
 
+  // ── Undo ──────────────────────────────────────────────────────────────────
+  // Deleting is a single click everywhere; the way back is this toast, not a
+  // second click on the same button. Two-click confirms taxed every delete —
+  // including the overwhelming majority the user meant — to guard the rare
+  // misclick, and they still lost the record once the second click landed.
+  //
+  // `keys` names the top-level data fields the delete touched. Undo restores
+  // only those (see 'data/restore'), so anything the user changed elsewhere in
+  // the ~9s the toast is up is not rolled back with it. Pass every field the
+  // handler writes: deleting an expense also appends to the parent template's
+  // skippedMonths, so it owns `recurrings` as well as `expenses`.
+  const deleteWithUndo = useCallback((keys, run, msg, undoMsg, type = 'danger') => {
+    const snapshot = dataRef.current;
+    run();
+    showToast(msg, type, {
+      action: {
+        label: 'Poništi',
+        onClick: () => {
+          dispatch({ type: 'data/restore', payload: { snapshot, keys } });
+          showToast(undoMsg);
+        },
+      },
+    });
+  }, [showToast]);
+
   // ── Persistence ───────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -226,8 +251,9 @@ export default function App() {
 
   // ── Actions ───────────────────────────────────────────────────────────────
   // Thin wrappers over dispatch: they mint ids, raise toasts, and nothing else.
-  // `dispatch` and `showToast` are both stable, so this object is built once —
-  // which is what keeps the context value from changing on every render.
+  // `dispatch`, `showToast` and `deleteWithUndo` are all stable, so this object
+  // is built once — which is what keeps the context value from changing on
+  // every render.
 
   const actions = useMemo(() => ({
     addExpense: (expense) => {
@@ -238,12 +264,18 @@ export default function App() {
       dispatch({ type: 'expense/update', payload: { id, updates } });
       showToast('Trošak izmenjen.');
     },
+    // A generated row also writes skippedMonths on its template, so undoing it
+    // has to lift that too — otherwise the row comes back only to be skipped
+    // out again on the next generation pass. A hand-entered expense touches
+    // nothing but `expenses`, and claiming `recurrings` there would roll back a
+    // template added while the toast was up.
     deleteExpense: (id) => {
       const wasGenerated = !!dataRef.current.expenses.find((e) => e.id === id)?.recurringId;
-      dispatch({ type: 'expense/delete', payload: { id } });
-      showToast(
+      deleteWithUndo(
+        wasGenerated ? ['expenses', 'recurrings'] : ['expenses'],
+        () => dispatch({ type: 'expense/delete', payload: { id } }),
         wasGenerated ? 'Trošak obrisan — neće biti ponovo kreiran.' : 'Trošak obrisan.',
-        'danger'
+        'Trošak vraćen.'
       );
     },
 
@@ -256,8 +288,12 @@ export default function App() {
       showToast('Ponavljajući trošak izmenjen — važi od sledećeg meseca.');
     },
     deleteRecurring: (id) => {
-      dispatch({ type: 'recurring/delete', payload: { id } });
-      showToast('Ponavljajući trošak uklonjen.', 'danger');
+      deleteWithUndo(
+        ['recurrings'],
+        () => dispatch({ type: 'recurring/delete', payload: { id } }),
+        'Ponavljajući trošak uklonjen.',
+        'Ponavljajući trošak vraćen.'
+      );
     },
 
     setMonthlyNote: (year, month, text) =>
@@ -271,21 +307,38 @@ export default function App() {
       dispatch({ type: 'category/rename', payload: { oldName, newName } });
       showToast('Kategorija preimenovana.');
     },
+    // Deleting a category rewrites every expense that used it to "Ostalo", so
+    // `expenses` is part of what undo has to put back, not just the name.
     deleteCategory: (name) => {
-      dispatch({ type: 'category/delete', payload: { name } });
-      showToast('Kategorija obrisana.', 'danger');
+      deleteWithUndo(
+        ['categories', 'categoryGroups', 'expenses'],
+        () => dispatch({ type: 'category/delete', payload: { name } }),
+        'Kategorija obrisana.',
+        `Kategorija "${name}" vraćena.`
+      );
     },
     archiveCategory: (name) => {
-      dispatch({ type: 'category/archive', payload: { name } });
-      showToast(`Kategorija "${name}" arhivirana.`);
+      deleteWithUndo(
+        ['categories', 'categoryGroups'],
+        () => dispatch({ type: 'category/archive', payload: { name } }),
+        `Kategorija "${name}" arhivirana.`,
+        `Kategorija "${name}" vraćena.`,
+        'success'
+      );
     },
 
     addCategoryGroup: (name) =>
       dispatch({ type: 'group/add', payload: { id: newId(), name } }),
     renameCategoryGroup: (id, name) =>
       dispatch({ type: 'group/rename', payload: { id, name } }),
-    deleteCategoryGroup: (id) =>
-      dispatch({ type: 'group/delete', payload: { id } }),
+    deleteCategoryGroup: (id) => {
+      deleteWithUndo(
+        ['categoryGroups'],
+        () => dispatch({ type: 'group/delete', payload: { id } }),
+        'Grupa obrisana.',
+        'Grupa vraćena.'
+      );
+    },
     updateCategoryGroupMembers: (groupId, members) =>
       dispatch({ type: 'group/setMembers', payload: { groupId, members } }),
 
@@ -298,8 +351,16 @@ export default function App() {
         type: 'budget/addFund',
         payload: { year, fund: { id: newId(), name, amounts: Array(12).fill(null) } },
       }),
-    removeBudgetFund: (year, fundId) =>
-      dispatch({ type: 'budget/removeFund', payload: { year, fundId } }),
+    // A fund row is twelve amounts plus whatever categories were mapped to it,
+    // so undo covers `trackingMaps` alongside `budget`.
+    removeBudgetFund: (year, fundId) => {
+      deleteWithUndo(
+        ['budget', 'trackingMaps'],
+        () => dispatch({ type: 'budget/removeFund', payload: { year, fundId } }),
+        'Red obrisan.',
+        'Red vraćen.'
+      );
+    },
     renameBudgetFund: (year, fundId, name) =>
       dispatch({ type: 'budget/renameFund', payload: { year, fundId, name } }),
     reorderBudgetFunds: (year, orderedIds) =>
@@ -318,10 +379,17 @@ export default function App() {
       showToast('Cilj izmenjen.');
     },
     deleteSavingsGoal: (id) => {
-      dispatch({ type: 'goal/delete', payload: { id } });
-      showToast('Cilj obrisan.', 'danger');
+      deleteWithUndo(
+        ['savingsGoals'],
+        () => dispatch({ type: 'goal/delete', payload: { id } }),
+        'Cilj obrisan.',
+        'Cilj vraćen.'
+      );
     },
 
+    // Not routed through deleteWithUndo: import is the one action that replaces
+    // *every* field, including ones the incoming file doesn't mention, so undo
+    // here has to be a wholesale replace rather than a per-field restore.
     importData: (imported, { skipped = 0 } = {}) => {
       // Import replaces everything, so keep the previous state reachable for as
       // long as the toast is up.
@@ -347,7 +415,7 @@ export default function App() {
       dispatch({ type: 'budget/import', payload: { budget } });
       showToast('Budžet uvezen uspešno.');
     },
-  }), [showToast]);
+  }), [showToast, deleteWithUndo]);
 
   const ctx = useMemo(() => ({
     data,
@@ -391,7 +459,9 @@ export default function App() {
         </main>
 
         {toast && (
-          <div className={`toast toast--${toast.type}`}>
+          // The toast is now the only feedback a delete gives, and the only
+          // route back from one — a screen reader user has to hear it arrive.
+          <div className={`toast toast--${toast.type}`} role="status">
             <span>{toast.type === 'success' ? '✓' : '✕'} {toast.msg}</span>
             {toast.action && (
               <button

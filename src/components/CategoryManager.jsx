@@ -45,6 +45,10 @@ export default function CategoryManager() {
     setEditingIdx(null);
   }
 
+  // Not a confirm — 🗑️ expands into the two things "remove" can mean here, and
+  // the user has to say which. Deletes elsewhere lost their second click in
+  // favour of the undo toast; this one stays because it asks a question rather
+  // than repeating one. Both outcomes are undoable from the toast.
   function handleDelete(name) {
     setConfirmDelete(name);
     setTimeout(() => setConfirmDelete(null), 2500);

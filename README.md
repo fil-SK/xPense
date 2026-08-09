@@ -15,8 +15,15 @@ Realizovana uz pomoć Claude AI-ja.
 - Pregled troškova za **tekući mesec** sa statistikama (ukupno, broj transakcija, prosek, top kategorija)
 - Pregled **prethodnih meseci i godina** — navigacija po godini, sve 12 meseci vidljivo odjednom
 - Pretraga i sortiranje unutar svakog meseca (po datumu, iznosu, kategoriji)
-- Brisanje troškova sa dvostrukom potvrdom
+- Brisanje troškova jednim klikom, sa opcijom **Poništi** u poruci koja se pojavi
 - Inline izmena svakog troška
+
+### Poništavanje brisanja
+- Svako brisanje je **jedan klik** — nema dvostruke potvrde
+- Odmah nakon brisanja pojavljuje se poruka sa dugmetom **Poništi**, koje vraća obrisano
+- Radi za troškove, ponavljajuće troškove, ciljeve štednje, kategorije, grupe i budžetske redove — kao i za uvoz JSON fajla
+- Poništavanje vraća samo ono što je brisanje dodirnulo, pa izmena napravljena u međuvremenu ostaje sačuvana
+- Poruka traje oko 9 sekundi; nakon toga brisanje je konačno
 
 ### Kategorije
 - Potpuno prilagodljive kategorije troškova
@@ -84,7 +91,7 @@ Realizovana uz pomoć Claude AI-ja.
 - Opciono povezivanje sa **budžetskim fondom** za određenu godinu — napredak se automatski izračunava kao zbir svih mesečnih alokacija u tom fondu
 - Progress bar sa bojama: sivo (0%) → narandžasto (1–59%) → indigo (60–99%) → zeleno (100%)
 - Ciljevi bez fonda prikazuju 0 / cilj kao ručni podsetnik
-- Brisanje cilja zahteva dvostruki klik (potvrda)
+- Brisanje cilja je jedan klik, sa opcijom **Poništi**
 - Prikazano na početnoj strani ispod ponavljajućih troškova
 
 ### Uvoz i izvoz

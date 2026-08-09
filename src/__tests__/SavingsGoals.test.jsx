@@ -117,14 +117,13 @@ describe('SavingsGoals — goal display', () => {
     expect(screen.getByText(/Godišnji odmor/)).toBeInTheDocument();
   });
 
-  test('delete requires two clicks', async () => {
+  // The confirm click was replaced by the undo on the toast.
+  test('delete fires on the first click', async () => {
     const user = userEvent.setup();
     const { deleteSavingsGoal } = renderGoals({ savingsGoals: [unlinkedGoal] });
-    const delBtn = screen.getByTitle(/obriši cilj/i);
-    await user.click(delBtn);
-    expect(deleteSavingsGoal).not.toHaveBeenCalled();
-    await user.click(screen.getByTitle(/potvrdi brisanje/i));
+    await user.click(screen.getByRole('button', { name: /obriši cilj: peni fond/i }));
     expect(deleteSavingsGoal).toHaveBeenCalledWith('g1');
+    expect(deleteSavingsGoal).toHaveBeenCalledTimes(1);
   });
 });
 

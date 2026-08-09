@@ -80,7 +80,7 @@ function BudgetCell({ value, onSave }) {
 }
 
 function SortableFundRow({
-  fund, cols, currentMonth, confirmDelete,
+  fund, cols, currentMonth,
   onSave, onDelete, onStartRename, onRename, onRenameCancel,
   editingFundId, editingFundName, setEditingFundName,
   expanded, onToggleExpand, categories, mapped, onToggleCat,
@@ -139,12 +139,14 @@ function SortableFundRow({
             📂{mapped.length > 0 ? ` ${mapped.length}` : ''}
           </button>
 
+          {/* One click — the undo on the toast replaces the confirm. */}
           <button
-            className={`bg__del-btn ${confirmDelete === fund.id ? 'bg__del-btn--confirm' : ''}`}
+            className="bg__del-btn"
             onClick={() => onDelete(fund.id)}
-            title={confirmDelete === fund.id ? 'Klikni ponovo za potvrdu' : 'Obriši red'}
+            title="Obriši red"
+            aria-label={`Obriši red: ${fund.name}`}
           >
-            {confirmDelete === fund.id ? '⚠' : '×'}
+            ×
           </button>
         </td>
 
@@ -216,7 +218,6 @@ export default function BudgetView() {
   const [newFundName, setNewFundName] = useState('');
   const [editingFundId, setEditingFundId] = useState(null);
   const [editingFundName, setEditingFundName] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState(null);
   const [copyConfirm, setCopyConfirm] = useState(false);
   const [expandedFundId, setExpandedFundId] = useState(null);
   const addInputRef = useRef(null);
@@ -244,16 +245,6 @@ export default function BudgetView() {
     addBudgetFund(year, name);
     setNewFundName('');
     addInputRef.current?.focus();
-  }
-
-  function handleDeleteFund(fundId) {
-    if (confirmDelete === fundId) {
-      removeBudgetFund(year, fundId);
-      setConfirmDelete(null);
-    } else {
-      setConfirmDelete(fundId);
-      setTimeout(() => setConfirmDelete(null), 2500);
-    }
   }
 
   function handleStartRename(fundId, name) {
@@ -443,9 +434,8 @@ export default function BudgetView() {
                       fund={fund}
                       cols={cols}
                       currentMonth={currentMonth}
-                      confirmDelete={confirmDelete}
                       onSave={(fundId, m, v) => updateBudgetFund(year, fundId, m, v)}
-                      onDelete={handleDeleteFund}
+                      onDelete={(fundId) => removeBudgetFund(year, fundId)}
                       onStartRename={handleStartRename}
                       onRename={handleRename}
                       onRenameCancel={() => setEditingFundId(null)}

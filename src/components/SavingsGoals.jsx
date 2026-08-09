@@ -21,7 +21,6 @@ export default function SavingsGoals() {
   const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState('');
   const [target, setTarget] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState(null);
 
   const budgetYears = Object.keys(data.budget ?? {}).map(Number).sort((a, b) => b - a);
   const defaultYear = budgetYears[0] ?? new Date().getFullYear();
@@ -81,16 +80,6 @@ export default function SavingsGoals() {
     if (editingId) updateSavingsGoal(editingId, payload);
     else addSavingsGoal(payload);
     closeForm();
-  }
-
-  function handleDelete(id) {
-    if (confirmDelete === id) {
-      deleteSavingsGoal(id);
-      setConfirmDelete(null);
-    } else {
-      setConfirmDelete(id);
-      setTimeout(() => setConfirmDelete(null), 2500);
-    }
   }
 
   return (
@@ -193,13 +182,14 @@ export default function SavingsGoals() {
                     >
                       ✏️
                     </button>
+                    {/* One click — the undo on the toast replaces the confirm. */}
                     <button
-                      className={`btn btn--icon btn--ghost btn--sm${confirmDelete === goal.id ? ' btn--danger' : ''}`}
-                      onClick={() => handleDelete(goal.id)}
-                      title={confirmDelete === goal.id ? 'Potvrdi brisanje' : 'Obriši cilj'}
-                      aria-label={confirmDelete === goal.id ? `Potvrdi brisanje: ${goal.name}` : `Obriši cilj: ${goal.name}`}
+                      className="btn btn--icon btn--ghost btn--sm"
+                      onClick={() => deleteSavingsGoal(goal.id)}
+                      title="Obriši cilj"
+                      aria-label={`Obriši cilj: ${goal.name}`}
                     >
-                      {confirmDelete === goal.id ? '⚠' : '🗑️'}
+                      🗑️
                     </button>
                   </div>
                 </div>

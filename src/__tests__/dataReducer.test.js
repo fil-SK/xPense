@@ -69,7 +69,64 @@ describe('dataReducer routing', () => {
     run(data, 'expense/add', { id: 'x', title: 'X', date: '2025-02-01', amount: 1, category: 'Hrana' });
     run(data, 'category/delete', { name: 'Hrana' });
     run(data, 'budget/removeFund', { year: 2025, fundId: 'f1' });
+    run(data, 'data/restore', { snapshot: baseData(), keys: ['expenses'] });
     expect(data).toEqual(snapshot);
+  });
+});
+
+// The undo behind every delete toast. It restores named fields only — that is
+// the whole point of it existing next to data/replace, so the tests below pin
+// both halves: the named field comes back, the unnamed one does not.
+describe('data/restore', () => {
+  test('restores a named field from the snapshot', () => {
+    const before = baseData();
+    const after = run(before, 'expense/delete', { id: 'e1' });
+    const undone = run(after, 'data/restore', { snapshot: before, keys: ['expenses'] });
+    expect(undone.expenses).toEqual(before.expenses);
+  });
+
+  test('leaves fields the delete never touched at their current value', () => {
+    const before = baseData();
+    const afterDelete = run(before, 'expense/delete', { id: 'e1' });
+    // Something unrelated happens while the undo toast is up.
+    const afterEdit = run(afterDelete, 'category/add', { name: 'Putovanja' });
+
+    const undone = run(afterEdit, 'data/restore', { snapshot: before, keys: ['expenses'] });
+    expect(undone.expenses).toEqual(before.expenses);
+    expect(undone.categories).toContain('Putovanja');
+  });
+
+  test('restores several fields at once', () => {
+    const before = baseData();
+    const after = run(before, 'category/delete', { name: 'Hrana' });
+    expect(after.expenses[0].category).toBe('Ostalo');
+
+    const undone = run(after, 'data/restore', {
+      snapshot: before,
+      keys: ['categories', 'categoryGroups', 'expenses'],
+    });
+    expect(undone.categories).toContain('Hrana');
+    expect(undone.expenses[0].category).toBe('Hrana');
+    expect(undone.categoryGroups).toEqual(before.categoryGroups);
+  });
+
+  // Deleting a generated expense also writes skippedMonths on the template, so
+  // restoring `expenses` alone would put the row back and let the next
+  // generation pass skip it right out again.
+  test('lifting skippedMonths needs recurrings in the key list', () => {
+    const before = baseData({
+      expenses: [{ id: 'r1-jan', recurringId: 'r1', title: 'Kirija', date: '2025-01-01', amount: 500, category: 'Ostalo' }],
+      recurrings: [{ id: 'r1', title: 'Kirija', amount: 500, category: 'Ostalo', startDate: '2025-01-01', frequency: 'monthly' }],
+    });
+    const after = run(before, 'expense/delete', { id: 'r1-jan' });
+    expect(after.recurrings[0].skippedMonths).toEqual(['2025-01']);
+
+    const undone = run(after, 'data/restore', {
+      snapshot: before,
+      keys: ['expenses', 'recurrings'],
+    });
+    expect(undone.expenses).toHaveLength(1);
+    expect(undone.recurrings[0].skippedMonths).toBeUndefined();
   });
 });
 

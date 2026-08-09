@@ -292,8 +292,10 @@ thead .bg__col--current { background: #e0e7ff !important; }
   flex-shrink: 0;
 }
 .bg__row--fund:hover .bg__del-btn { opacity: 1; }
+/* A keyboard user never hovers, so the button would otherwise be focusable and
+   invisible — and it now deletes on the first press. */
+.bg__del-btn:focus-visible { opacity: 1; }
 .bg__del-btn:hover { color: var(--danger); background: var(--danger-light); }
-.bg__del-btn--confirm { opacity: 1 !important; color: var(--warning) !important; }
 
 /* Category chip on fund rows */
 .bg__cat-chip {

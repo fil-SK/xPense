@@ -6,18 +6,15 @@ import ExpenseModal from './ExpenseModal.jsx';
 export default function ExpenseItem({ expense }) {
   const { data, deleteExpense } = useApp();
   const [editing, setEditing] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const color = categoryColor(expense.category, data.categories);
 
+  // One click, no confirm — the undo on the toast is what covers a misclick,
+  // and unlike a second click it also covers the deletes the user meant to
+  // make and then regretted.
   function handleDelete(e) {
     e.stopPropagation();
-    if (confirmDelete) {
-      deleteExpense(expense.id);
-    } else {
-      setConfirmDelete(true);
-      setTimeout(() => setConfirmDelete(false), 2500);
-    }
+    deleteExpense(expense.id);
   }
 
   // The row can't be a real <button> — it wraps the edit/delete buttons, and a
@@ -67,11 +64,12 @@ export default function ExpenseItem({ expense }) {
             ✏️
           </button>
           <button
-            className={`btn btn--icon btn--sm ${confirmDelete ? 'btn--danger' : 'btn--ghost'}`}
-            title={confirmDelete ? 'Klikni ponovo za brisanje' : 'Obriši'}
+            className="btn btn--icon btn--ghost btn--sm"
+            title="Obriši"
+            aria-label={`Obriši trošak: ${expense.title}`}
             onClick={handleDelete}
           >
-            {confirmDelete ? '⚠️' : '🗑️'}
+            🗑️
           </button>
         </div>
       </div>
