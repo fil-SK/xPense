@@ -93,6 +93,27 @@ describe('GlobalSearch', () => {
     expect(navigateTo).toHaveBeenCalledWith('home');
   });
 
+  // Results used to be clickable <div>s — no role, no tab stop.
+  test('each result is a real button, reachable by keyboard', async () => {
+    const user = userEvent.setup();
+    renderSearch(SAMPLE_EXPENSES);
+    await user.type(screen.getByRole('textbox'), 'Taksi');
+    const row = screen.getByRole('button', { name: /taksi — otvori februar 2025/i });
+    expect(row.tagName).toBe('BUTTON');
+    // The input holds focus on mount, so one Tab lands on the only result.
+    await user.tab();
+    expect(row).toHaveFocus();
+  });
+
+  test('Enter on a focused result navigates to its month', async () => {
+    const user = userEvent.setup();
+    const { navigateTo } = renderSearch(SAMPLE_EXPENSES);
+    await user.type(screen.getByRole('textbox'), 'Taksi');
+    await user.tab();
+    await user.keyboard('{Enter}');
+    expect(navigateTo).toHaveBeenCalledWith('month', 2025, 1);
+  });
+
   test('recurring badge is shown for recurring expenses', async () => {
     const user = userEvent.setup();
     renderSearch(SAMPLE_EXPENSES);

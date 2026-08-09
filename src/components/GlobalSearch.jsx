@@ -58,8 +58,19 @@ export default function GlobalSearch() {
           {results.map((e) => {
             const d = new Date(e.date + 'T00:00:00');
             const color = categoryColor(e.category, data.categories);
+            const monthLabel = `${MONTHS_SR[d.getMonth()]} ${d.getFullYear()}`;
             return (
-              <div key={e.id} className="expense-item" onClick={() => goToMonth(e)} style={{ cursor: 'pointer' }}>
+              // A real <button>: the row carries no nested controls here, so it
+              // needs no hand-rolled key handling. The label spells out where
+              // the click goes — read out, the row contents alone are just a
+              // run of date, category and amount fragments.
+              <button
+                key={e.id}
+                type="button"
+                className="expense-item"
+                aria-label={`${e.title} — otvori ${monthLabel}`}
+                onClick={() => goToMonth(e)}
+              >
                 <span className="expense-item__icon" style={{ background: color + '22' }}>
                   <span className="expense-item__cat-dot" style={{ background: color }} />
                 </span>
@@ -70,15 +81,13 @@ export default function GlobalSearch() {
                     <span className="expense-item__cat-badge" style={{ background: color + '22', color }}>
                       {e.category}
                     </span>
-                    <span className="gsearch__month-tag">
-                      {MONTHS_SR[d.getMonth()]} {d.getFullYear()}
-                    </span>
+                    <span className="gsearch__month-tag">{monthLabel}</span>
                     {e.recurringId && <span title="Ponavljajući trošak">🔄</span>}
                     {e.note && <span title={e.note}>📝</span>}
                   </div>
                 </div>
                 <div className="expense-item__amount">{formatAmount(e.amount)}</div>
-              </div>
+              </button>
             );
           })}
         </div>

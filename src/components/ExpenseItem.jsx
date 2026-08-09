@@ -20,9 +20,29 @@ export default function ExpenseItem({ expense }) {
     }
   }
 
+  // The row can't be a real <button> — it wraps the edit/delete buttons, and a
+  // button may not nest interactive content — so it gets the keyboard contract
+  // by hand. Those nested buttons bubble their own Enter/Space up here, hence
+  // the target check: without it, ✏️ would open the modal twice and 🗑️ would
+  // open it on top of the delete. Space is prevented so it doesn't scroll.
+  function handleKeyDown(e) {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setEditing(true);
+    }
+  }
+
   return (
     <>
-      <div className="expense-item" onClick={() => setEditing(true)}>
+      <div
+        className="expense-item"
+        role="button"
+        tabIndex={0}
+        aria-label={`Izmeni trošak: ${expense.title}`}
+        onClick={() => setEditing(true)}
+        onKeyDown={handleKeyDown}
+      >
         <span className="expense-item__icon" style={{ background: color + '22' }}>
           <span className="expense-item__cat-dot" style={{ background: color }} />
         </span>

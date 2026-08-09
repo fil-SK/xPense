@@ -28,6 +28,24 @@
 }
 .expense-item:first-child { border-top: none; }
 .expense-item:hover { background: var(--bg-hover); }
+/* The row is keyboard-operable in both places it appears, but not as the same
+   element: MonthView's is a role="button" <div> (it wraps the edit/delete
+   buttons, which a real button may not nest), GlobalSearch's is a plain
+   <button>. Strip the UA button chrome so the two render identically. Order
+   matters — `border: none` must land before the border-top is restored, and
+   :first-child outranks this rule, so the top row still has no line. */
+button.expense-item {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--border2);
+}
+/* Inset, because .expense-list clips its children (overflow: hidden) and an
+   outer ring would be shaved off on the first and last row. */
+.expense-item:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
 .expense-item__icon {
   width: 42px;
   height: 42px;
@@ -83,6 +101,9 @@
   transition: opacity .12s;
 }
 .expense-item:hover .expense-item__actions { opacity: 1; }
+/* A keyboard user never hovers, so without this the ✏️/🗑️ buttons stay at
+   opacity 0 while focused — focusable but invisible. */
+.expense-item:focus-within .expense-item__actions { opacity: 1; }
 
 /* ── Recurring expenses ───────────────────────────────────────────────────── */
 .expense-item__recurring { font-size: 11px; }

@@ -108,10 +108,21 @@ export default function PreviousSpendings() {
 
       <div className="months-grid">
         {monthsData.map(({ month, total, count, isFuture, isCurrent, note, hasDelta, deltaPct }) => (
-          <div
+          // A real <button>, disabled for future months — that was already the
+          // dead state, and disabled keeps it out of the tab order without a
+          // second code path. The label is spelled out because the card's own
+          // text ("Januar", "3 transakcija", "12.400", "RSD") reads as loose
+          // fragments.
+          <button
             key={month}
+            type="button"
             className="month-card"
-            onClick={() => !isFuture && openMonth(month)}
+            disabled={isFuture}
+            aria-label={
+              `${getMonthName(month)} ${selectedYear} — ` +
+              (count === 0 ? 'nema troškova' : `${count} transakcija, ${formatAmount(total)}`)
+            }
+            onClick={() => openMonth(month)}
             style={{
               opacity: isFuture ? 0.35 : 1,
               cursor: isFuture ? 'default' : 'pointer',
@@ -156,7 +167,7 @@ export default function PreviousSpendings() {
                 {note.length > 55 ? note.slice(0, 55) + '…' : note}
               </div>
             )}
-          </div>
+          </button>
         ))}
       </div>
     </div>
