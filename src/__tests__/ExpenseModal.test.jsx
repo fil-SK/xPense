@@ -244,6 +244,125 @@ describe('ExpenseModal — category group picker', () => {
   });
 });
 
+// ─── Unsaved-changes guard ───────────────────────────────────────────────────
+
+const confirmVisible = () => screen.queryByRole('alertdialog') !== null;
+
+describe('ExpenseModal — discard confirmation', () => {
+  test('clicking the overlay on an untouched form closes immediately', async () => {
+    const user = userEvent.setup();
+    const { onClose, container } = renderModal();
+    await user.click(container.querySelector('.modal-overlay'));
+    expect(onClose).toHaveBeenCalled();
+    expect(confirmVisible()).toBe(false);
+  });
+
+  test('clicking the overlay with a filled field asks before discarding', async () => {
+    const user = userEvent.setup();
+    const { onClose, container } = renderModal();
+    await user.type(screen.getByPlaceholderText(/npr/i), 'Kafa');
+    await user.click(container.querySelector('.modal-overlay'));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+  });
+
+  test('confirming the discard closes the modal', async () => {
+    const user = userEvent.setup();
+    const { onClose, container } = renderModal();
+    await user.type(screen.getByPlaceholderText(/npr/i), 'Kafa');
+    await user.click(container.querySelector('.modal-overlay'));
+    await user.click(screen.getByRole('button', { name: /^odbaci$/i }));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  test('cancelling the discard keeps the modal and the typed values', async () => {
+    const user = userEvent.setup();
+    const { onClose, container } = renderModal();
+    await user.type(screen.getByPlaceholderText(/npr/i), 'Kafa');
+    await user.click(container.querySelector('.modal-overlay'));
+    await user.click(screen.getByRole('button', { name: /nastavi unos/i }));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(confirmVisible()).toBe(false);
+    expect(screen.getByDisplayValue('Kafa')).toBeInTheDocument();
+  });
+
+  test('the ✕ and Otkaži buttons are guarded too', async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderModal();
+    await user.type(screen.getByRole('spinbutton'), '350');
+
+    await user.click(screen.getByRole('button', { name: /zatvori/i }));
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /nastavi unos/i }));
+
+    await user.click(screen.getByRole('button', { name: /otkaži/i }));
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  test('Escape asks first, and a second Escape returns to the form', async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderModal();
+    await user.type(screen.getByPlaceholderText(/npr/i), 'Kafa');
+
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+
+    await user.keyboard('{Escape}');
+    expect(confirmVisible()).toBe(false);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByDisplayValue('Kafa')).toBeInTheDocument();
+  });
+
+  test('selecting a category alone counts as unsaved work', async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderModal();
+    await user.click(screen.getByRole('button', { name: 'Hrana' }));
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  test('toggling recurring alone counts as unsaved work', async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderModal();
+    await user.click(screen.getByRole('button', { name: /ponavljajući trošak/i }));
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  test('an unmodified edit form closes without asking', async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderModal(existingExpense);
+    await user.keyboard('{Escape}');
+    expect(onClose).toHaveBeenCalled();
+    expect(confirmVisible()).toBe(false);
+  });
+
+  test('an edited edit form asks before discarding', async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderModal(existingExpense);
+    await user.type(screen.getByDisplayValue('Stari trošak'), ' dopuna');
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  test('saving is never blocked by the guard', async () => {
+    const user = userEvent.setup();
+    const { addExpense, onClose } = renderModal();
+    await user.type(screen.getByPlaceholderText(/npr/i), 'Kafa');
+    await user.type(screen.getByRole('spinbutton'), '350');
+    await user.click(screen.getByRole('button', { name: 'Hrana' }));
+    await user.click(screen.getByRole('button', { name: /dodaj trošak/i }));
+    expect(addExpense).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+    expect(confirmVisible()).toBe(false);
+  });
+});
+
 // ─── Layout ──────────────────────────────────────────────────────────────────
 
 describe('ExpenseModal — scrollable body', () => {

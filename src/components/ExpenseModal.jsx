@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { todayISO, categoryColor } from '../utils/helpers.js';
 import { useApp } from '../App.jsx';
 
@@ -93,19 +93,48 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
   const { data, addExpense, updateExpense, addRecurring } = useApp();
   const isEdit = !!expense;
 
-  const [form, setForm] = useState(
+  // Only the first value survives, so this is the form as it was when the modal opened.
+  const pristine = useRef(
     isEdit
       ? { title: expense.title, date: expense.date, amount: String(expense.amount), category: expense.category, note: expense.note ?? '' }
       : { title: '', date: defaultDate ?? todayISO(), amount: '', category: '', note: '' }
   );
+
+  const [form, setForm] = useState(pristine.current);
   const [errors, setErrors] = useState({});
   const [recurring, setRecurring] = useState(false);
+  const [confirmingClose, setConfirmingClose] = useState(false);
+
+  const dirty = useMemo(
+    () => recurring || Object.keys(form).some((k) => form[k] !== pristine.current[k]),
+    [form, recurring]
+  );
+
+  // Closing throws the form away, so an edited form asks first. Every exit route
+  // (overlay, ✕, Otkaži, Escape) goes through here — they all discard the same work.
+  const returnFocus = useRef(null);
+  const requestClose = useCallback(() => {
+    if (!dirty) { onClose(); return; }
+    returnFocus.current = document.activeElement;
+    setConfirmingClose(true);
+  }, [dirty, onClose]);
+
+  // The form stays mounted behind the confirm, so the field the user left is still there to go back to.
+  const cancelClose = useCallback(() => {
+    setConfirmingClose(false);
+    returnFocus.current?.focus?.();
+  }, []);
 
   useEffect(() => {
-    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    const handler = (e) => {
+      if (e.key !== 'Escape') return;
+      // While the confirm is up, Escape dismisses it and returns to the form.
+      if (confirmingClose) cancelClose();
+      else requestClose();
+    };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
+  }, [confirmingClose, cancelClose, requestClose]);
 
   function set(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -145,11 +174,11 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
   const hasGroups = (data.categoryGroups?.length ?? 0) > 0;
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal">
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && requestClose()}>
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="expense-modal-title">
         <div className="modal__header">
-          <span className="modal__title">{isEdit ? 'Izmeni trošak' : 'Novi trošak'}</span>
-          <button className="modal__close" onClick={onClose}>✕</button>
+          <span className="modal__title" id="expense-modal-title">{isEdit ? 'Izmeni trošak' : 'Novi trošak'}</span>
+          <button className="modal__close" onClick={requestClose} aria-label="Zatvori">✕</button>
         </div>
 
         <div className="modal__body">
@@ -160,9 +189,10 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
               value={form.title}
               onChange={(e) => set('title', e.target.value)}
               placeholder="npr. Ručak, Gorivo, Netflix..."
+              aria-invalid={!!errors.title}
               autoFocus
             />
-            {errors.title && <span className="form-error">{errors.title}</span>}
+            {errors.title && <span className="form-error" role="alert">{errors.title}</span>}
           </div>
 
           <div className="form-row">
@@ -173,8 +203,9 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
                 className={`form-input ${errors.date ? 'form-input--error' : ''}`}
                 value={form.date}
                 onChange={(e) => set('date', e.target.value)}
+                aria-invalid={!!errors.date}
               />
-              {errors.date && <span className="form-error">{errors.date}</span>}
+              {errors.date && <span className="form-error" role="alert">{errors.date}</span>}
             </div>
             <div className="form-group">
               <label className="form-label">Iznos (RSD)</label>
@@ -185,8 +216,9 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
                 value={form.amount}
                 onChange={(e) => set('amount', e.target.value)}
                 placeholder="0"
+                aria-invalid={!!errors.amount}
               />
-              {errors.amount && <span className="form-error">{errors.amount}</span>}
+              {errors.amount && <span className="form-error" role="alert">{errors.amount}</span>}
             </div>
           </div>
 
@@ -223,7 +255,7 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
                 })}
               </div>
             )}
-            {errors.category && <span className="form-error">{errors.category}</span>}
+            {errors.category && <span className="form-error" role="alert">{errors.category}</span>}
           </div>
 
           <div className="form-group">
@@ -250,10 +282,37 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
         </div>
 
         <div className="modal__footer">
-          <button className="btn btn--ghost" onClick={onClose}>Otkaži</button>
+          <button className="btn btn--ghost" onClick={requestClose}>Otkaži</button>
           <button className="btn btn--primary" onClick={handleSubmit} disabled={!form.category}>
             {isEdit ? 'Sačuvaj izmene' : 'Dodaj trošak'}
           </button>
+        </div>
+      </div>
+
+      {confirmingClose && <DiscardConfirm onKeepEditing={cancelClose} onDiscard={onClose} />}
+    </div>
+  );
+}
+
+function DiscardConfirm({ onKeepEditing, onDiscard }) {
+  const keepRef = useRef(null);
+  useEffect(() => { keepRef.current?.focus(); }, []);
+
+  return (
+    <div
+      className="modal-overlay modal-overlay--stacked"
+      onClick={(e) => e.target === e.currentTarget && onKeepEditing()}
+    >
+      <div className="modal modal--confirm" role="alertdialog" aria-modal="true" aria-labelledby="discard-title" aria-describedby="discard-text">
+        <div className="modal__header">
+          <span className="modal__title" id="discard-title">Odbaci unos?</span>
+        </div>
+        <p className="modal__text" id="discard-text">
+          Uneti podaci nisu sačuvani i biće izgubljeni ako zatvoriš.
+        </p>
+        <div className="modal__footer">
+          <button className="btn btn--ghost" ref={keepRef} onClick={onKeepEditing}>Nastavi unos</button>
+          <button className="btn btn--danger" onClick={onDiscard}>Odbaci</button>
         </div>
       </div>
     </div>

@@ -54,7 +54,7 @@ describe('Home — quick-add button', () => {
     const user = userEvent.setup();
     renderHome();
     await user.click(screen.getByRole('button', { name: /dodaj trošak/i }));
-    await user.click(screen.getByRole('button', { name: '✕' }));
+    await user.click(screen.getByRole('button', { name: /zatvori/i }));
     expect(screen.queryByText('Novi trošak', modalTitle)).not.toBeInTheDocument();
   });
 

@@ -68,3 +68,10 @@
   flex-shrink: 0;
 }
 .modal__footer .btn { flex: 1; justify-content: center; padding: 14px; font-size: 14.5px; border-radius: var(--radius-sm); }
+
+/* ── Stacked confirm (discard-changes prompt over an open modal) ── */
+.modal-overlay--stacked { z-index: 210; background: rgba(15, 23, 42, .35); }
+.modal--confirm { width: 400px; }
+.modal--confirm .modal__header { margin-bottom: 12px; }
+.modal--confirm .modal__title { font-size: 20px; }
+.modal__text { font-size: 14px; line-height: 1.5; color: var(--text-muted); margin: 0; }
