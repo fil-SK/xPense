@@ -1,6 +1,6 @@
 // Pure business logic functions — no React, no side effects.
 
-import { isoDate } from './helpers.js';
+import { isoDate, monthKey } from './helpers.js';
 
 // "Nothing worth keeping yet." Used to decide whether restoring from the backup
 // file is safe — categories alone are defaults, so they don't count as content.
@@ -31,7 +31,7 @@ export function generateRecurringExpenses(recurrings, existingExpenses, now = ne
       const mFrom = y === sy ? sm : 0;
       const mTo = y === curYear ? curMonth : 11;
       for (let m = mFrom; m <= mTo; m++) {
-        const monthStr = `${y}-${String(m + 1).padStart(2, '0')}`;
+        const monthStr = monthKey(y, m);
         if (skipped.has(monthStr)) continue;
         const exists = existingExpenses.some(
           (e) => e.recurringId === r.id && e.date.startsWith(monthStr)

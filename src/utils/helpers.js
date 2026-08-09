@@ -29,12 +29,18 @@ export function lastDayOfMonth(year, month) {
   return new Date(year, month + 1, 0).getDate();
 }
 
+// Builds the 'YYYY-MM' key that prefixes every stored date. Also the format of
+// `skippedMonths` entries on a recurring template.
+export function monthKey(year, month) {
+  return `${year}-${String(month + 1).padStart(2, '0')}`;
+}
+
 // Builds a YYYY-MM-DD string, clamping the day to the month's real length.
 // Without the clamp, day 31 in February produces '2026-02-31', which JS parses
 // as March 3 — the expense then shows up in the wrong month.
 export function isoDate(year, month, day) {
   const clamped = Math.min(day, lastDayOfMonth(year, month));
-  return `${year}-${String(month + 1).padStart(2, '0')}-${String(clamped).padStart(2, '0')}`;
+  return `${monthKey(year, month)}-${String(clamped).padStart(2, '0')}`;
 }
 
 // Repairs an out-of-range date string in place ('2026-02-31' → '2026-02-28').
@@ -49,11 +55,18 @@ export function clampISODate(dateStr) {
   return isoDate(year, month, day);
 }
 
+// Hot path: Home calls this twice per render and PreviousSpendings 24 times in
+// its memo, so a Date per expense per call was doing real work at a few thousand
+// expenses. Dates are stored as 'YYYY-MM-DD', so the month is a string prefix —
+// no parse, and no timezone in the picture at all.
+//
+// It is also more correct than parsing. `new Date('2026-02-31T00:00:00')` rolls
+// over to March 3, so a malformed date used to land in the wrong month; the
+// prefix match keeps it in the month it names. Stored dates are clamped by
+// repairExpenseDates on load, so this only matters for rows written before that.
 export function getExpensesForMonth(expenses, year, month) {
-  return expenses.filter((e) => {
-    const d = new Date(e.date + 'T00:00:00');
-    return d.getFullYear() === year && d.getMonth() === month;
-  });
+  const prefix = monthKey(year, month);
+  return expenses.filter((e) => e.date?.startsWith(prefix));
 }
 
 export function getTotalAmount(expenses) {
@@ -68,12 +81,17 @@ export function getByCategory(expenses) {
   return map;
 }
 
+// Reads year and month straight off the 'YYYY-MM-DD' string for the same reason
+// getExpensesForMonth does — this walks every expense, and parsing each one was
+// pure overhead. A row without a usable date is skipped rather than filed under
+// a NaN year, which is what the Date version produced.
 export function getAvailableMonths(expenses) {
   const map = {};
   expenses.forEach((e) => {
-    const d = new Date(e.date + 'T00:00:00');
-    const y = d.getFullYear();
-    const m = d.getMonth();
+    if (!/^\d{4}-\d{2}/.test(e.date ?? '')) return;
+    const y = Number(e.date.slice(0, 4));
+    const m = Number(e.date.slice(5, 7)) - 1;
+    if (m < 0 || m > 11) return;
     if (!map[y]) map[y] = new Set();
     map[y].add(m);
   });

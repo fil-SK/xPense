@@ -1,7 +1,7 @@
 import {
   formatAmount, formatDate, todayISO,
   getExpensesForMonth, getTotalAmount, getByCategory, getAvailableMonths,
-  lastDayOfMonth, isoDate, clampISODate, categoryColor, CHART_COLORS,
+  lastDayOfMonth, isoDate, clampISODate, categoryColor, CHART_COLORS, monthKey,
 } from '../utils/helpers.js';
 
 describe('categoryColor', () => {
@@ -162,6 +162,39 @@ describe('getExpensesForMonth', () => {
     expect(getExpensesForMonth(expenses, 2024, 2)).toHaveLength(1);
     expect(getExpensesForMonth(expenses, 2025, 2)).toHaveLength(2);
   });
+
+  // Matching on the 'YYYY-MM' prefix rather than parsing a Date per expense.
+  test('pads single-digit months so it cannot match a neighbour', () => {
+    const padded = [{ date: '2025-01-05' }, { date: '2025-11-05' }, { date: '2025-12-05' }];
+    expect(getExpensesForMonth(padded, 2025, 0)).toHaveLength(1);
+    expect(getExpensesForMonth(padded, 2025, 10)).toHaveLength(1);
+    expect(getExpensesForMonth(padded, 2025, 11)).toHaveLength(1);
+  });
+
+  test('files an out-of-range day under the month it names, not the rolled-over one', () => {
+    // new Date('2026-02-31T00:00:00') is March 3, so the Date-parsing version
+    // put this row in March. Stored dates are clamped on load, but a row that
+    // predates that repair must still land in February.
+    const malformed = [{ date: '2026-02-31' }];
+    expect(getExpensesForMonth(malformed, 2026, 1)).toHaveLength(1);
+    expect(getExpensesForMonth(malformed, 2026, 2)).toHaveLength(0);
+  });
+
+  test('ignores rows with a missing date instead of throwing', () => {
+    const ragged = [{ date: '2025-03-05' }, { date: undefined }, {}, { date: null }];
+    expect(getExpensesForMonth(ragged, 2025, 2)).toHaveLength(1);
+  });
+});
+
+describe('monthKey', () => {
+  test('pads the month to two digits', () => {
+    expect(monthKey(2025, 0)).toBe('2025-01');
+    expect(monthKey(2025, 11)).toBe('2025-12');
+  });
+
+  test('prefixes the isoDate for the same month', () => {
+    expect(isoDate(2025, 1, 14).startsWith(monthKey(2025, 1))).toBe(true);
+  });
 });
 
 describe('getTotalAmount', () => {
@@ -219,5 +252,22 @@ describe('getAvailableMonths', () => {
       { date: '2025-03-15' },
     ];
     expect(getAvailableMonths(expenses)[2025]).toEqual([2]);
+  });
+
+  test('reads December and January off the string without off-by-one', () => {
+    const result = getAvailableMonths([{ date: '2025-01-01' }, { date: '2025-12-31' }]);
+    expect(result[2025]).toEqual([11, 0]);
+  });
+
+  test('skips rows with an unusable date rather than filing them under NaN', () => {
+    const result = getAvailableMonths([
+      { date: '2025-03-01' },
+      { date: undefined },
+      { date: '' },
+      {},
+      { date: 'not-a-date' },
+    ]);
+    expect(result).toEqual({ 2025: [2] });
+    expect(Object.keys(result)).toEqual(['2025']);
   });
 });
