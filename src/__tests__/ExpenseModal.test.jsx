@@ -1,29 +1,33 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AppContext } from '../App.jsx';
 import ExpenseModal from '../components/ExpenseModal.jsx';
 
 const DEFAULT_CATEGORIES = ['Hrana', 'Transport', 'Zabava'];
 
-function renderModal(expense = undefined, ctxOverrides = {}) {
+function renderModal(expense = undefined, ctxOverrides = {}, props = {}) {
   const addExpense = vi.fn();
   const updateExpense = vi.fn();
   const addRecurring = vi.fn();
+  const updateRecurring = vi.fn();
+  const addCategory = vi.fn();
   const onClose = vi.fn();
   const ctx = {
     data: { expenses: [], categories: DEFAULT_CATEGORIES, budget: {}, trackingMaps: {}, recurrings: [] },
     addExpense,
     updateExpense,
     addRecurring,
+    updateRecurring,
+    addCategory,
     showToast: vi.fn(),
     ...ctxOverrides,
   };
   const { container } = render(
     <AppContext.Provider value={ctx}>
-      <ExpenseModal expense={expense} onClose={onClose} />
+      <ExpenseModal expense={expense} onClose={onClose} {...props} />
     </AppContext.Provider>
   );
-  return { addExpense, updateExpense, addRecurring, onClose, container };
+  return { addExpense, updateExpense, addRecurring, updateRecurring, addCategory, onClose, container };
 }
 
 // ─── Add mode ────────────────────────────────────────────────────────────────
@@ -519,5 +523,164 @@ describe('ExpenseModal — scrollable body', () => {
     expect(body).toContainElement(screen.getByRole('button', { name: /ponavljajući trošak/i }));
     expect(body).not.toContainElement(screen.getByText('Novi trošak'));
     expect(body).not.toContainElement(screen.getByRole('button', { name: /dodaj trošak/i }));
+  });
+});
+
+// ─── Inline "add category" ───────────────────────────────────────────────────
+
+describe('ExpenseModal — inline category creation', () => {
+  const addBtn = { name: /nova kategorija/i };
+  const nameInput = () => screen.getByLabelText(/naziv nove kategorije/i);
+
+  test('offers an add-category button next to the picker', () => {
+    renderModal();
+    expect(screen.getByRole('button', addBtn)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/naziv nove kategorije/i)).not.toBeInTheDocument();
+  });
+
+  test('clicking it reveals a labelled input and focuses it', async () => {
+    const user = userEvent.setup();
+    renderModal();
+    await user.click(screen.getByRole('button', addBtn));
+    expect(nameInput()).toBeInTheDocument();
+    expect(nameInput()).toHaveFocus();
+  });
+
+  test('saving adds the category and selects it, which enables submit', async () => {
+    const user = userEvent.setup();
+    const { addCategory } = renderModal();
+    expect(screen.getByRole('button', { name: /dodaj trošak/i })).toBeDisabled();
+    await user.click(screen.getByRole('button', addBtn));
+    await user.type(nameInput(), '  Zdravlje  ');
+    await user.click(screen.getByRole('button', { name: /^dodaj$/i }));
+    expect(addCategory).toHaveBeenCalledWith('Zdravlje');
+    expect(screen.getByRole('button', { name: /dodaj trošak/i })).not.toBeDisabled();
+  });
+
+  // The input sits inside the expense <form>, so Enter must not save the expense.
+  test('Enter in the name field adds the category instead of submitting the form', async () => {
+    const user = userEvent.setup();
+    const { addCategory, addExpense } = renderModal();
+    await user.type(screen.getByPlaceholderText(/npr\. Ručak/i), 'Lek');
+    await user.type(screen.getByRole('spinbutton'), '450');
+    await user.click(screen.getByRole('button', addBtn));
+    await user.type(nameInput(), 'Zdravlje{Enter}');
+    expect(addCategory).toHaveBeenCalledWith('Zdravlje');
+    expect(addExpense).not.toHaveBeenCalled();
+  });
+
+  test('an existing name is rejected with an error tied to the input', async () => {
+    const user = userEvent.setup();
+    const { addCategory } = renderModal();
+    await user.click(screen.getByRole('button', addBtn));
+    await user.type(nameInput(), 'Hrana');
+    await user.click(screen.getByRole('button', { name: /^dodaj$/i }));
+    expect(addCategory).not.toHaveBeenCalled();
+    const error = screen.getByText(/kategorija već postoji/i);
+    expect(nameInput()).toHaveAttribute('aria-describedby', error.id);
+  });
+
+  test('an empty name is rejected', async () => {
+    const user = userEvent.setup();
+    const { addCategory } = renderModal();
+    await user.click(screen.getByRole('button', addBtn));
+    await user.click(screen.getByRole('button', { name: /^dodaj$/i }));
+    expect(addCategory).not.toHaveBeenCalled();
+    expect(screen.getByText(/unesite naziv kategorije/i)).toBeInTheDocument();
+  });
+
+  // Escape must peel off one layer at a time, not jump straight out of the modal.
+  test('Escape closes the name field and keeps the modal open', async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderModal();
+    await user.click(screen.getByRole('button', addBtn));
+    await user.type(nameInput(), 'Zdravlje');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByLabelText(/naziv nove kategorije/i)).not.toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', addBtn)).toHaveFocus();
+  });
+
+  // Note the modal footer has an "Otkaži" of its own, so this one is scoped.
+  test('cancelling returns focus to the add-category button', async () => {
+    const user = userEvent.setup();
+    const { container } = renderModal();
+    await user.click(screen.getByRole('button', addBtn));
+    await user.click(within(container.querySelector('.cat-add')).getByRole('button', { name: /otkaži/i }));
+    expect(screen.queryByLabelText(/naziv nove kategorije/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', addBtn)).toHaveFocus();
+  });
+
+  test('a half-typed category name counts as unsaved work', async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderModal();
+    await user.click(screen.getByRole('button', addBtn));
+    await user.type(nameInput(), 'Zdrav');
+    await user.click(screen.getByRole('button', { name: /zatvori/i }));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText(/odbaci unos/i)).toBeInTheDocument();
+  });
+});
+
+// ─── Recurring template edit ─────────────────────────────────────────────────
+
+describe('ExpenseModal — editing a recurring template', () => {
+  const TEMPLATE = {
+    id: 'r1',
+    title: 'Netflix',
+    amount: 800,
+    category: 'Zabava',
+    note: 'porodični',
+    startDate: '2026-03-04',
+    frequency: 'monthly',
+  };
+
+  const renderTemplate = () => renderModal(undefined, {}, { recurring: TEMPLATE });
+
+  test('opens with the template values and its own heading', () => {
+    renderTemplate();
+    expect(screen.getByText('Izmeni ponavljajući trošak', { selector: '.modal__title' })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/npr\. Ručak/i)).toHaveValue('Netflix');
+    expect(screen.getByRole('spinbutton')).toHaveValue(800);
+    expect(screen.getByRole('button', { name: 'Zabava' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  // Moving the start date would back-fill or orphan whole months, so it is shown
+  // as text rather than as an editable field.
+  test('shows the start date read-only, with no date input at all', () => {
+    const { container } = renderTemplate();
+    expect(container.querySelector('input[type="date"]')).toBeNull();
+    expect(screen.getByText('2026-03-04')).toBeInTheDocument();
+    expect(screen.getByText(/datum početka se ne menja/i)).toBeInTheDocument();
+  });
+
+  test('hides the make-recurring toggle — it is already recurring', () => {
+    renderTemplate();
+    expect(screen.queryByRole('button', { name: 'Ponavljajući trošak' })).not.toBeInTheDocument();
+  });
+
+  test('saving calls updateRecurring without touching startDate', async () => {
+    const user = userEvent.setup();
+    const { updateRecurring, addRecurring, addExpense, onClose } = renderTemplate();
+    await user.clear(screen.getByRole('spinbutton'));
+    await user.type(screen.getByRole('spinbutton'), '1200');
+    await user.click(screen.getByRole('button', { name: /sačuvaj izmene/i }));
+
+    expect(updateRecurring).toHaveBeenCalledTimes(1);
+    const [id, updates] = updateRecurring.mock.calls[0];
+    expect(id).toBe('r1');
+    expect(updates).toEqual({ title: 'Netflix', amount: 1200, category: 'Zabava', note: 'porodični' });
+    expect(updates).not.toHaveProperty('date');
+    expect(updates).not.toHaveProperty('startDate');
+    expect(addRecurring).not.toHaveBeenCalled();
+    expect(addExpense).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  test('an unchanged template closes without the discard confirm', async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderTemplate();
+    await user.click(screen.getByRole('button', { name: /zatvori/i }));
+    expect(onClose).toHaveBeenCalled();
   });
 });

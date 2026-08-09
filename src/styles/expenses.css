@@ -106,3 +106,4 @@
 .recurring-item__body { flex: 1; min-width: 0; }
 .recurring-item__title { font-weight: 600; font-size: 14px; }
 .recurring-item__meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.recurring-item__actions { display: flex; gap: 4px; flex-shrink: 0; }

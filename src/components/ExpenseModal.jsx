@@ -99,9 +99,13 @@ function CategoryGroupPicker({ categories, groups, selected, onSelect, hasError 
   );
 }
 
-export default function ExpenseModal({ expense, defaultDate, onClose }) {
-  const { data, addExpense, updateExpense, addRecurring } = useApp();
+// One modal, three jobs: add an expense, edit an expense, edit a recurring
+// template. `recurring` and `expense` are mutually exclusive — pass at most one.
+export default function ExpenseModal({ expense, recurring, defaultDate, onClose }) {
+  const { data, addExpense, updateExpense, addRecurring, updateRecurring, addCategory } = useApp();
+  const isRecurringEdit = !!recurring;
   const isEdit = !!expense;
+  const source = expense ?? recurring;
 
   const uid = useId();
   const fieldId = (name) => `${uid}-${name}`;
@@ -109,24 +113,42 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
 
   // Only the first value survives, so this is the form as it was when the modal opened.
   const pristine = useRef(
-    isEdit
-      ? { title: expense.title, date: expense.date, amount: String(expense.amount), category: expense.category, note: expense.note ?? '' }
+    source
+      ? {
+          title: source.title ?? '',
+          date: (isRecurringEdit ? source.startDate : source.date) ?? '',
+          amount: String(source.amount ?? ''),
+          category: source.category ?? '',
+          note: source.note ?? '',
+        }
       : { title: '', date: defaultDate ?? todayISO(), amount: '', category: '', note: '' }
   );
 
   const [form, setForm] = useState(pristine.current);
   const [errors, setErrors] = useState({});
-  const [recurring, setRecurring] = useState(false);
+  const [makeRecurring, setMakeRecurring] = useState(false);
   const [confirmingClose, setConfirmingClose] = useState(false);
+
+  // Inline category creation. It lives up here rather than inside the picker so
+  // the Escape handler below can close the little form instead of the modal.
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [newCategory, setNewCategory] = useState('');
+  const [categoryAddError, setCategoryAddError] = useState('');
+  const addCategoryBtnRef = useRef(null);
+  const refocusAddBtn = useRef(false);
 
   // While the discard confirm is up it owns the trap; this one steps aside so the
   // two don't fight over focus.
   const dialogRef = useRef(null);
   useFocusTrap(dialogRef, { active: !confirmingClose });
 
+  // A half-typed category name is unsaved input too, so it counts as dirty.
   const dirty = useMemo(
-    () => recurring || Object.keys(form).some((k) => form[k] !== pristine.current[k]),
-    [form, recurring]
+    () =>
+      makeRecurring ||
+      newCategory.trim() !== '' ||
+      Object.keys(form).some((k) => form[k] !== pristine.current[k]),
+    [form, makeRecurring, newCategory]
   );
 
   // Closing throws the form away, so an edited form asks first. Every exit route
@@ -144,20 +166,54 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
     returnFocus.current?.focus?.();
   }, []);
 
+  const closeAddCategory = useCallback(() => {
+    refocusAddBtn.current = true;
+    setAddingCategory(false);
+    setNewCategory('');
+    setCategoryAddError('');
+  }, []);
+
   useEffect(() => {
     const handler = (e) => {
       if (e.key !== 'Escape') return;
-      // While the confirm is up, Escape dismisses it and returns to the form.
+      // Innermost thing first: the confirm, then the inline category form, then
+      // the modal itself. Escape should never skip a level.
       if (confirmingClose) cancelClose();
+      else if (addingCategory) closeAddCategory();
       else requestClose();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [confirmingClose, cancelClose, requestClose]);
+  }, [confirmingClose, addingCategory, cancelClose, closeAddCategory, requestClose]);
+
+  // The button unmounts while the little form is open, so the focus it should
+  // get back has to wait for it to render again.
+  useEffect(() => {
+    if (addingCategory || !refocusAddBtn.current) return;
+    refocusAddBtn.current = false;
+    addCategoryBtnRef.current?.focus();
+  }, [addingCategory]);
 
   function set(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
     setErrors((e) => ({ ...e, [field]: undefined }));
+  }
+
+  // The new category is saved globally right away — same as CategoryManager —
+  // and selected, so the user lands back on a filled-in form.
+  function commitNewCategory() {
+    const name = newCategory.trim();
+    if (!name) {
+      setCategoryAddError('Unesite naziv kategorije.');
+      return;
+    }
+    if (data.categories.includes(name)) {
+      setCategoryAddError('Kategorija već postoji.');
+      return;
+    }
+    addCategory(name);
+    set('category', name);
+    closeAddCategory();
   }
 
   function validate() {
@@ -165,7 +221,7 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
     if (!form.title.trim()) errs.title = 'Naslov je obavezan.';
     if (!form.amount || isNaN(Number(form.amount)) || Number(form.amount) <= 0)
       errs.amount = 'Unesite ispravan iznos.';
-    if (!form.date) errs.date = 'Datum je obavezan.';
+    if (!isRecurringEdit && !form.date) errs.date = 'Datum je obavezan.';
     if (!form.category) errs.category = 'Kategorija je obavezna.';
     return errs;
   }
@@ -181,9 +237,13 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
       category: form.category,
       note: form.note.trim(),
     };
-    if (isEdit) {
+    if (isRecurringEdit) {
+      // startDate stays put: moving it would back-fill or orphan whole months.
+      const { date, ...rest } = payload;
+      updateRecurring(recurring.id, rest);
+    } else if (isEdit) {
       updateExpense(expense.id, payload);
-    } else if (recurring) {
+    } else if (makeRecurring) {
       addRecurring({ ...payload, startDate: payload.date, frequency: 'monthly' });
     } else {
       addExpense(payload);
@@ -192,12 +252,15 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
   }
 
   const hasGroups = (data.categoryGroups?.length ?? 0) > 0;
+  const heading = isRecurringEdit
+    ? 'Izmeni ponavljajući trošak'
+    : isEdit ? 'Izmeni trošak' : 'Novi trošak';
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && requestClose()}>
       <div className="modal" role="dialog" aria-modal="true" aria-labelledby={fieldId('heading')} ref={dialogRef}>
         <div className="modal__header">
-          <span className="modal__title" id={fieldId('heading')}>{isEdit ? 'Izmeni trošak' : 'Novi trošak'}</span>
+          <span className="modal__title" id={fieldId('heading')}>{heading}</span>
           <button type="button" className="modal__close" onClick={requestClose} aria-label="Zatvori">✕</button>
         </div>
 
@@ -221,19 +284,31 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
             </div>
 
             <div className="form-row">
-              <div className="form-group">
-                <label className="form-label" htmlFor={fieldId('date')}>Datum</label>
-                <input
-                  id={fieldId('date')}
-                  type="date"
-                  className={`form-input ${errors.date ? 'form-input--error' : ''}`}
-                  value={form.date}
-                  onChange={(e) => set('date', e.target.value)}
-                  aria-invalid={!!errors.date}
-                  aria-describedby={errors.date ? errorId('date') : undefined}
-                />
-                {errors.date && <span className="form-error" role="alert" id={errorId('date')}>{errors.date}</span>}
-              </div>
+              {/* The start date is what the generator counts months from, so it
+                  is shown but not editable — see the note in CLAUDE.md. */}
+              {isRecurringEdit ? (
+                <div className="form-group">
+                  <span className="form-label">Počinje od</span>
+                  <div className="form-static">
+                    {form.date || '—'}
+                    <span className="form-static__hint">datum početka se ne menja</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="form-group">
+                  <label className="form-label" htmlFor={fieldId('date')}>Datum</label>
+                  <input
+                    id={fieldId('date')}
+                    type="date"
+                    className={`form-input ${errors.date ? 'form-input--error' : ''}`}
+                    value={form.date}
+                    onChange={(e) => set('date', e.target.value)}
+                    aria-invalid={!!errors.date}
+                    aria-describedby={errors.date ? errorId('date') : undefined}
+                  />
+                  {errors.date && <span className="form-error" role="alert" id={errorId('date')}>{errors.date}</span>}
+                </div>
+              )}
               <div className="form-group">
                 <label className="form-label" htmlFor={fieldId('amount')}>Iznos (RSD)</label>
                 <input
@@ -286,6 +361,40 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
                   })}
                 </div>
               )}
+              {addingCategory ? (
+                <div className="cat-add">
+                  <label className="cat-add__label" htmlFor={fieldId('newcat')}>Naziv nove kategorije</label>
+                  <div className="cat-add__row">
+                    <input
+                      id={fieldId('newcat')}
+                      className={`form-input ${categoryAddError ? 'form-input--error' : ''}`}
+                      value={newCategory}
+                      onChange={(e) => { setNewCategory(e.target.value); setCategoryAddError(''); }}
+                      // Enter must add the category, not submit the expense —
+                      // this input sits inside the same <form>.
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitNewCategory(); } }}
+                      placeholder="npr. Zdravlje"
+                      aria-invalid={!!categoryAddError}
+                      aria-describedby={categoryAddError ? errorId('newcat') : undefined}
+                      autoFocus
+                    />
+                    <button type="button" className="btn btn--primary btn--sm" onClick={commitNewCategory}>Dodaj</button>
+                    <button type="button" className="btn btn--ghost btn--sm" onClick={closeAddCategory}>Otkaži</button>
+                  </div>
+                  {categoryAddError && (
+                    <span className="form-error" role="alert" id={errorId('newcat')}>{categoryAddError}</span>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="cat-add__toggle"
+                  ref={addCategoryBtnRef}
+                  onClick={() => setAddingCategory(true)}
+                >
+                  + Nova kategorija
+                </button>
+              )}
               {errors.category && <span className="form-error" role="alert">{errors.category}</span>}
             </div>
 
@@ -300,14 +409,14 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
               />
             </div>
 
-            {!isEdit && (
+            {!source && (
               <div className="form-recurring">
                 <button
                   type="button"
                   aria-label="Ponavljajući trošak"
-                  aria-pressed={recurring}
-                  className={`btn-recurring ${recurring ? 'btn-recurring--active' : ''}`}
-                  onClick={() => setRecurring((v) => !v)}
+                  aria-pressed={makeRecurring}
+                  className={`btn-recurring ${makeRecurring ? 'btn-recurring--active' : ''}`}
+                  onClick={() => setMakeRecurring((v) => !v)}
                 />
                 <span className="form-recurring__label">Ponavljajući trošak — automatski svakog meseca</span>
               </div>
@@ -317,7 +426,7 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
           <div className="modal__footer">
             <button type="button" className="btn btn--ghost" onClick={requestClose}>Otkaži</button>
             <button type="submit" className="btn btn--primary" disabled={!form.category}>
-              {isEdit ? 'Sačuvaj izmene' : 'Dodaj trošak'}
+              {source ? 'Sačuvaj izmene' : 'Dodaj trošak'}
             </button>
           </div>
         </form>

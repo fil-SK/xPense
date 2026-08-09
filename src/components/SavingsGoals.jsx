@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { useApp } from '../App.jsx';
 import { formatAmount } from '../utils/helpers.js';
 
@@ -10,16 +10,22 @@ function getBarClass(pct) {
 }
 
 export default function SavingsGoals() {
-  const { data, addSavingsGoal, deleteSavingsGoal } = useApp();
+  const { data, addSavingsGoal, updateSavingsGoal, deleteSavingsGoal } = useApp();
   const goals = data.savingsGoals ?? [];
 
+  const uid = useId();
+  const fieldId = (name) => `${uid}-${name}`;
+
+  // null = form closed. A string id means the form is editing that goal.
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState('');
   const [target, setTarget] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(null);
 
   const budgetYears = Object.keys(data.budget ?? {}).map(Number).sort((a, b) => b - a);
-  const [goalYear, setGoalYear] = useState(() => budgetYears[0] ?? new Date().getFullYear());
+  const defaultYear = budgetYears[0] ?? new Date().getFullYear();
+  const [goalYear, setGoalYear] = useState(defaultYear);
   const [fundId, setFundId] = useState('');
 
   const availableFunds = data.budget?.[goalYear]?.funds ?? [];
@@ -33,20 +39,48 @@ export default function SavingsGoals() {
     return { saved, pct };
   }
 
-  function handleSubmit() {
+  function openAdd() {
+    setEditingId(null);
+    setName('');
+    setTarget('');
+    setGoalYear(defaultYear);
+    setFundId('');
+    setShowForm(true);
+  }
+
+  // Edit reuses the add form rather than an inline one, so there is a single
+  // place where a goal's fields are laid out and validated.
+  function openEdit(goal) {
+    setEditingId(goal.id);
+    setName(goal.name);
+    setTarget(String(goal.target));
+    setGoalYear(goal.year ?? defaultYear);
+    setFundId(goal.fundId ?? '');
+    setShowForm(true);
+  }
+
+  function closeForm() {
+    setShowForm(false);
+    setEditingId(null);
+    setName('');
+    setTarget('');
+    setFundId('');
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
     const trimmedName = name.trim();
     const num = Math.round(Number(String(target).replace(/\./g, '').replace(',', '.')));
     if (!trimmedName || !num || num <= 0) return;
-    addSavingsGoal({
+    const payload = {
       name: trimmedName,
       target: num,
       year: fundId ? goalYear : null,
       fundId: fundId || null,
-    });
-    setName('');
-    setTarget('');
-    setFundId('');
-    setShowForm(false);
+    };
+    if (editingId) updateSavingsGoal(editingId, payload);
+    else addSavingsGoal(payload);
+    closeForm();
   }
 
   function handleDelete(id) {
@@ -61,58 +95,77 @@ export default function SavingsGoals() {
 
   return (
     <div className="home__goals">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+      <div className="home__goals-head">
         <div className="home__section-title">Ciljevi štednje</div>
-        <button className="btn btn--ghost btn--sm" onClick={() => setShowForm((v) => !v)}>
+        <button
+          className="btn btn--ghost btn--sm"
+          aria-expanded={showForm}
+          onClick={() => (showForm ? closeForm() : openAdd())}
+        >
           {showForm ? '✕ Otkaži' : '+ Dodaj cilj'}
         </button>
       </div>
 
       {showForm && (
-        <div className="goal-form">
+        <form className="goal-form" onSubmit={handleSubmit}>
+          <div className="goal-form__title">{editingId ? 'Izmeni cilj' : 'Novi cilj'}</div>
           <div className="goal-form__row">
-            <input
-              className="goal-form__input"
-              placeholder="Naziv cilja (npr. Godišnji odmor)"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-            />
-            <input
-              className="goal-form__input"
-              type="number"
-              placeholder="Ciljna suma (RSD)"
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-              min="1"
-            />
+            <div className="goal-form__field">
+              <label className="goal-form__label" htmlFor={fieldId('name')}>Naziv cilja</label>
+              <input
+                id={fieldId('name')}
+                className="goal-form__input"
+                placeholder="Naziv cilja (npr. Godišnji odmor)"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+            <div className="goal-form__field">
+              <label className="goal-form__label" htmlFor={fieldId('target')}>Ciljna suma (RSD)</label>
+              <input
+                id={fieldId('target')}
+                className="goal-form__input"
+                type="number"
+                placeholder="Ciljna suma (RSD)"
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+                min="1"
+              />
+            </div>
           </div>
           {budgetYears.length > 0 && (
             <div className="goal-form__row">
-              <select
-                className="goal-form__input"
-                value={goalYear}
-                onChange={(e) => { setGoalYear(Number(e.target.value)); setFundId(''); }}
-              >
-                {budgetYears.map((y) => <option key={y} value={y}>{y}</option>)}
-              </select>
-              <select
-                className="goal-form__input"
-                value={fundId}
-                onChange={(e) => setFundId(e.target.value)}
-              >
-                <option value="">— bez fonda —</option>
-                {availableFunds.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-              </select>
+              <div className="goal-form__field">
+                <label className="goal-form__label" htmlFor={fieldId('year')}>Godina</label>
+                <select
+                  id={fieldId('year')}
+                  className="goal-form__input"
+                  value={goalYear}
+                  onChange={(e) => { setGoalYear(Number(e.target.value)); setFundId(''); }}
+                >
+                  {budgetYears.map((y) => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+              <div className="goal-form__field">
+                <label className="goal-form__label" htmlFor={fieldId('fund')}>Fond</label>
+                <select
+                  id={fieldId('fund')}
+                  className="goal-form__input"
+                  value={fundId}
+                  onChange={(e) => setFundId(e.target.value)}
+                >
+                  <option value="">— bez fonda —</option>
+                  {availableFunds.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
+              </div>
             </div>
           )}
           <div className="goal-form__actions">
-            <button className="btn btn--primary btn--sm" onClick={handleSubmit}>
-              Dodaj cilj
+            <button type="submit" className="btn btn--primary btn--sm">
+              {editingId ? 'Sačuvaj izmene' : 'Dodaj cilj'}
             </button>
           </div>
-        </div>
+        </form>
       )}
 
       {goals.length > 0 ? (
@@ -131,13 +184,24 @@ export default function SavingsGoals() {
                       <div className="goal-item__fund">{goal.year} · {linkedFund.name}</div>
                     )}
                   </div>
-                  <button
-                    className={`btn btn--icon btn--ghost btn--sm${confirmDelete === goal.id ? ' btn--danger' : ''}`}
-                    onClick={() => handleDelete(goal.id)}
-                    title={confirmDelete === goal.id ? 'Potvrdi brisanje' : 'Obriši cilj'}
-                  >
-                    {confirmDelete === goal.id ? '⚠' : '🗑️'}
-                  </button>
+                  <div className="goal-item__actions">
+                    <button
+                      className="btn btn--icon btn--ghost btn--sm"
+                      onClick={() => openEdit(goal)}
+                      title="Izmeni cilj"
+                      aria-label={`Izmeni cilj: ${goal.name}`}
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      className={`btn btn--icon btn--ghost btn--sm${confirmDelete === goal.id ? ' btn--danger' : ''}`}
+                      onClick={() => handleDelete(goal.id)}
+                      title={confirmDelete === goal.id ? 'Potvrdi brisanje' : 'Obriši cilj'}
+                      aria-label={confirmDelete === goal.id ? `Potvrdi brisanje: ${goal.name}` : `Obriši cilj: ${goal.name}`}
+                    >
+                      {confirmDelete === goal.id ? '⚠' : '🗑️'}
+                    </button>
+                  </div>
                 </div>
                 <div className="goal-bar">
                   <div className={`goal-bar__fill ${getBarClass(pct)}`} style={{ width: `${pct}%` }} />
@@ -150,7 +214,7 @@ export default function SavingsGoals() {
           })}
         </div>
       ) : !showForm ? (
-        <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+        <div className="goal-empty">
           Nema postavljenih ciljeva. Dodaj cilj štednje sa iznosom koji želiš dostići.
         </div>
       ) : null}

@@ -12,6 +12,7 @@ import Charts from './Charts.jsx';
 export default function Home() {
   const { data, navigateTo, importData, showToast, deleteRecurring } = useApp();
   const [adding, setAdding] = useState(false);
+  const [editingRecurring, setEditingRecurring] = useState(null);
   const [showCharts, setShowCharts] = useState(false);
   const [pendingImport, setPendingImport] = useState(null);
   const now = new Date();
@@ -154,13 +155,24 @@ export default function Home() {
                     {formatAmount(r.amount)} · {r.category} · mesečno od {r.startDate.slice(0, 7)}
                   </div>
                 </div>
-                <button
-                  className="btn btn--icon btn--ghost btn--sm"
-                  title="Ukloni ponavljajući trošak (prethodni unosi ostaju)"
-                  onClick={() => deleteRecurring(r.id)}
-                >
-                  🗑️
-                </button>
+                <div className="recurring-item__actions">
+                  <button
+                    className="btn btn--icon btn--ghost btn--sm"
+                    title="Izmeni ponavljajući trošak"
+                    aria-label={`Izmeni ponavljajući trošak: ${r.title}`}
+                    onClick={() => setEditingRecurring(r)}
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    className="btn btn--icon btn--ghost btn--sm"
+                    title="Ukloni ponavljajući trošak (prethodni unosi ostaju)"
+                    aria-label={`Ukloni ponavljajući trošak: ${r.title}`}
+                    onClick={() => deleteRecurring(r.id)}
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -171,6 +183,10 @@ export default function Home() {
 
       {adding && (
         <ExpenseModal defaultDate={todayISO()} onClose={() => setAdding(false)} />
+      )}
+
+      {editingRecurring && (
+        <ExpenseModal recurring={editingRecurring} onClose={() => setEditingRecurring(null)} />
       )}
 
       {pendingImport && (

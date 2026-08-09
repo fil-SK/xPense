@@ -28,6 +28,13 @@ export const expenseHandlers = {
     recurrings: [...(data.recurrings ?? []), recurring],
   }),
 
+  // Patches the template only. Months already generated keep the values they
+  // were minted with — they are records of money that was actually spent.
+  'recurring/update': (data, { id, updates }) => ({
+    ...data,
+    recurrings: (data.recurrings ?? []).map((r) => (r.id === id ? { ...r, ...updates } : r)),
+  }),
+
   'recurring/delete': (data, { id }) => ({
     ...data,
     recurrings: (data.recurrings ?? []).filter((r) => r.id !== id),

@@ -3,6 +3,29 @@
 Known gaps that were consciously deferred, with enough context to pick them up cold.
 Newest first. Remove an entry when it ships.
 
+## Recurring expenses: the start date still can't be edited
+
+**Deferred:** 2026-08-09, while adding edit for recurring templates.
+
+`ExpenseModal` in recurring-edit mode shows `startDate` as read-only text. Everything
+else about a template is now editable, so a typo'd start date is the one field left
+needing delete-and-recreate.
+
+The reason it was left out: `generateRecurringExpenses` counts months from `startDate`,
+so moving it *earlier* back-fills every month in between on the next pass, and moving it
+*later* orphans the rows already generated before it — they stay in the list with a
+`recurringId` pointing at a template that no longer claims that month. Neither is wrong
+exactly, but both are surprising, and there is no UI that explains what just happened.
+
+**Proposed fix:** make the field editable and resolve the consequences explicitly at save
+time — show a confirm naming the counts ("3 meseca će biti dodata" / "2 postojeća unosa
+ostaju"), then either let the generator back-fill or delete the orphans. The counts are
+cheap to compute: both are a filter over `expenses` by `recurringId` and month prefix.
+
+**Effort:** medium. Mostly UI copy and a confirm dialog; the data work is a filter each way.
+
+---
+
 ## Recurring expenses: no way to un-skip a month
 
 **Deferred:** 2026-08-09, while fixing "deleted recurring expenses come back after reload".

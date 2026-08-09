@@ -121,6 +121,29 @@ describe('expenses slice', () => {
     expect(run(withOne, 'recurring/delete', { id: 'r1' }).recurrings).toEqual([]);
   });
 
+  test('recurring/update patches the template and leaves siblings alone', () => {
+    const data = baseData({
+      recurrings: [
+        { id: 'r1', title: 'Netflix', amount: 800, category: 'Zabava', startDate: '2025-01-04' },
+        { id: 'r2', title: 'Teretana', amount: 3000, category: 'Sport', startDate: '2025-01-01' },
+      ],
+    });
+    const result = run(data, 'recurring/update', { id: 'r1', updates: { amount: 1200 } });
+    expect(result.recurrings[0]).toMatchObject({ id: 'r1', title: 'Netflix', amount: 1200, startDate: '2025-01-04' });
+    expect(result.recurrings[1].amount).toBe(3000);
+  });
+
+  // Editing the template must not rewrite months that were already generated —
+  // those are records of money that was actually spent.
+  test('recurring/update leaves already generated expenses untouched', () => {
+    const data = baseData({
+      expenses: [{ id: 'g', recurringId: 'r1', date: '2025-02-04', amount: 800, category: 'Zabava', title: 'Netflix' }],
+      recurrings: [{ id: 'r1', title: 'Netflix', amount: 800, category: 'Zabava', startDate: '2025-01-04' }],
+    });
+    const result = run(data, 'recurring/update', { id: 'r1', updates: { amount: 1200 } });
+    expect(result.expenses[0].amount).toBe(800);
+  });
+
   test('note/set writes a nested year/month without disturbing siblings', () => {
     const seeded = baseData({ monthlyNotes: { 2025: { 0: 'januar' } } });
     const result = run(seeded, 'note/set', { year: 2025, month: 3, text: 'april' });
@@ -246,5 +269,17 @@ describe('budget slice', () => {
     const withGoal = run(baseData(), 'goal/add', { id: 'g1', name: 'Odmor', target: 100000 });
     expect(withGoal.savingsGoals).toHaveLength(1);
     expect(run(withGoal, 'goal/delete', { id: 'g1' }).savingsGoals).toEqual([]);
+  });
+
+  test('goal/update patches only the matching goal', () => {
+    const data = baseData({
+      savingsGoals: [
+        { id: 'g1', name: 'Odmor', target: 100000, fundId: null, year: null },
+        { id: 'g2', name: 'Auto', target: 500000, fundId: null, year: null },
+      ],
+    });
+    const result = run(data, 'goal/update', { id: 'g1', updates: { target: 120000, fundId: 'f1', year: 2025 } });
+    expect(result.savingsGoals[0]).toEqual({ id: 'g1', name: 'Odmor', target: 120000, fundId: 'f1', year: 2025 });
+    expect(result.savingsGoals[1].target).toBe(500000);
   });
 });

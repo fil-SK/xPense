@@ -153,3 +153,45 @@ describe('Home — redesigned overview + sections', () => {
     expect(screen.getByRole('button', { name: /sakrij/i })).toBeInTheDocument();
   });
 });
+
+describe('Home — recurring templates', () => {
+  const template = {
+    id: 'r1', title: 'Netflix', amount: 800, category: 'Hrana',
+    note: '', startDate: '2026-03-04', frequency: 'monthly',
+  };
+  const withTemplate = { recurrings: [template] };
+
+  function renderWithTemplate(extra = {}) {
+    return renderHome({
+      data: {
+        expenses: [], categories: ['Hrana'], budget: {}, trackingMaps: {},
+        monthlyNotes: {}, savingsGoals: [], ...withTemplate,
+      },
+      updateRecurring: vi.fn(),
+      addCategory: vi.fn(),
+      ...extra,
+    });
+  }
+
+  test('lists the template with edit and delete actions', () => {
+    renderWithTemplate();
+    expect(screen.getByRole('button', { name: /izmeni ponavljajući trošak: netflix/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /ukloni ponavljajući trošak: netflix/i })).toBeInTheDocument();
+  });
+
+  test('the edit button opens the modal on the template', async () => {
+    const user = userEvent.setup();
+    renderWithTemplate();
+    await user.click(screen.getByRole('button', { name: /izmeni ponavljajući trošak: netflix/i }));
+    expect(screen.getByText('Izmeni ponavljajući trošak', { selector: '.modal__title' })).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Netflix')).toBeInTheDocument();
+  });
+
+  test('delete still removes the template', async () => {
+    const user = userEvent.setup();
+    const deleteRecurring = vi.fn();
+    renderWithTemplate({ deleteRecurring });
+    await user.click(screen.getByRole('button', { name: /ukloni ponavljajući trošak: netflix/i }));
+    expect(deleteRecurring).toHaveBeenCalledWith('r1');
+  });
+});

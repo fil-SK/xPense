@@ -84,6 +84,11 @@ export const budgetHandlers = {
     savingsGoals: [...(data.savingsGoals ?? []), goal],
   }),
 
+  'goal/update': (data, { id, updates }) => ({
+    ...data,
+    savingsGoals: (data.savingsGoals ?? []).map((g) => (g.id === id ? { ...g, ...updates } : g)),
+  }),
+
   'goal/delete': (data, { id }) => ({
     ...data,
     savingsGoals: (data.savingsGoals ?? []).filter((g) => g.id !== id),

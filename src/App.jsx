@@ -249,6 +249,12 @@ export default function App() {
 
     addRecurring: (recurring) =>
       dispatch({ type: 'recurring/add', payload: { ...recurring, id: newId() } }),
+    // Only the template changes; the months it already produced keep their
+    // values, so the toast says when the new ones take effect.
+    updateRecurring: (id, updates) => {
+      dispatch({ type: 'recurring/update', payload: { id, updates } });
+      showToast('Ponavljajući trošak izmenjen — važi od sledećeg meseca.');
+    },
     deleteRecurring: (id) => {
       dispatch({ type: 'recurring/delete', payload: { id } });
       showToast('Ponavljajući trošak uklonjen.', 'danger');
@@ -306,6 +312,10 @@ export default function App() {
     addSavingsGoal: (goal) => {
       dispatch({ type: 'goal/add', payload: { ...goal, id: newId() } });
       showToast('Cilj dodat.');
+    },
+    updateSavingsGoal: (id, updates) => {
+      dispatch({ type: 'goal/update', payload: { id, updates } });
+      showToast('Cilj izmenjen.');
     },
     deleteSavingsGoal: (id) => {
       dispatch({ type: 'goal/delete', payload: { id } });
