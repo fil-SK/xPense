@@ -149,6 +149,51 @@ describe('generateRecurringExpenses', () => {
     expect(result.map((e) => e.date)).toEqual(['2025-02-15']);
   });
 
+  // The "already generated?" test is an index of 'recurringId|YYYY-MM' keys
+  // built once, rather than a scan of the expense list per candidate month.
+  // These pin the parts of that key that could silently go wrong.
+  test('an existing month for one template does not suppress another', () => {
+    const spotify = { ...netflixTemplate, id: 'r2', title: 'Spotify' };
+    const existing = [{ id: 'e1', date: '2025-02-15', recurringId: 'r1' }];
+    const now = new Date('2025-02-20');
+    const result = generateRecurringExpenses([netflixTemplate, spotify], existing, now);
+    // r1 already has February, r2 still needs January and February.
+    expect(result.filter((e) => e.recurringId === 'r1')).toHaveLength(1); // Jan only
+    expect(result.filter((e) => e.recurringId === 'r2')).toHaveLength(2);
+  });
+
+  test('matches an existing entry on any day of the month, not just the template day', () => {
+    // Template day is the 15th; the stored entry was edited to the 3rd.
+    const existing = [{ id: 'e1', date: '2025-02-03', recurringId: 'r1' }];
+    const now = new Date('2025-02-20');
+    const result = generateRecurringExpenses([netflixTemplate], existing, now);
+    expect(result.map((e) => e.date)).toEqual(['2025-01-15']);
+  });
+
+  test('a hand-entered expense in the same month does not count as generated', () => {
+    // No recurringId, so it must not suppress generation for that month.
+    const existing = [{ id: 'e1', date: '2025-02-15', amount: 800 }];
+    const now = new Date('2025-02-20');
+    const result = generateRecurringExpenses([netflixTemplate], existing, now);
+    expect(result.map((e) => e.date)).toEqual(['2025-01-15', '2025-02-15']);
+  });
+
+  test('an existing entry in a neighbouring month does not suppress this one', () => {
+    // Guards the zero-padding in the key: '2025-1' must not match '2025-11'.
+    const t = { ...netflixTemplate, startDate: '2025-11-15' };
+    const existing = [{ id: 'e1', date: '2025-12-15', recurringId: 'r1' }];
+    const now = new Date('2025-12-20');
+    const result = generateRecurringExpenses([t], existing, now);
+    expect(result.map((e) => e.date)).toEqual(['2025-11-15']);
+  });
+
+  test('tolerates an existing generated row with no date', () => {
+    const existing = [{ id: 'e1', recurringId: 'r1' }];
+    const now = new Date('2025-02-20');
+    expect(() => generateRecurringExpenses([netflixTemplate], existing, now)).not.toThrow();
+    expect(generateRecurringExpenses([netflixTemplate], existing, now)).toHaveLength(2);
+  });
+
   test('an empty or missing skippedMonths changes nothing', () => {
     const now = new Date('2025-03-01');
     expect(generateRecurringExpenses([{ ...netflixTemplate, skippedMonths: [] }], [], now)).toHaveLength(3);

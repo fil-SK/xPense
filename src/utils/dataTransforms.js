@@ -16,9 +16,26 @@ export function isEmptyData(data) {
   );
 }
 
+// Index of the (template, month) pairs that already have a generated expense,
+// keyed 'recurringId|YYYY-MM'. Only rows carrying a recurringId can match, so
+// hand-entered expenses never enter the index.
+//
+// This is what keeps the generator off the expense list: the "does this month
+// already exist?" test used to be a .some() over every expense, nested inside
+// the template × year × month loops, so the work grew as templates × months ×
+// expenses. Built once up front it is a single pass plus O(1) lookups.
+function indexGeneratedMonths(existingExpenses) {
+  const seen = new Set();
+  for (const e of existingExpenses) {
+    if (e.recurringId) seen.add(`${e.recurringId}|${e.date?.slice(0, 7)}`);
+  }
+  return seen;
+}
+
 export function generateRecurringExpenses(recurrings, existingExpenses, now = new Date()) {
   const curYear = now.getFullYear();
   const curMonth = now.getMonth();
+  const alreadyGenerated = indexGeneratedMonths(existingExpenses);
   const newExpenses = [];
   for (const r of recurrings) {
     // Months the user deleted by hand — regenerating them would undo that.
@@ -33,10 +50,7 @@ export function generateRecurringExpenses(recurrings, existingExpenses, now = ne
       for (let m = mFrom; m <= mTo; m++) {
         const monthStr = monthKey(y, m);
         if (skipped.has(monthStr)) continue;
-        const exists = existingExpenses.some(
-          (e) => e.recurringId === r.id && e.date.startsWith(monthStr)
-        );
-        if (!exists) {
+        if (!alreadyGenerated.has(`${r.id}|${monthStr}`)) {
           newExpenses.push({
             recurringId: r.id,
             title: r.title,
