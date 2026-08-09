@@ -1,5 +1,6 @@
 import {
   generateRecurringExpenses, applyBudgetCopy, isEmptyData, applyExpenseDeletion,
+  elapsedMonths, goalProgress,
 } from '../utils/dataTransforms.js';
 
 // ─── isEmptyData ──────────────────────────────────────────────────────────────
@@ -374,5 +375,82 @@ describe('applyBudgetCopy', () => {
     };
     const result = applyBudgetCopy(dataWithTarget, 2025, 2026);
     expect(result.budget[2026].funds.map((f) => f.name)).toEqual(['Hrana', 'Transport']);
+  });
+});
+
+// ─── elapsedMonths / goalProgress ─────────────────────────────────────────────
+
+describe('elapsedMonths', () => {
+  const march = new Date('2026-03-15T12:00:00');
+
+  test('counts the current month as elapsed', () => {
+    expect(elapsedMonths(2026, march)).toBe(3);
+  });
+
+  test('a past year is fully elapsed', () => {
+    expect(elapsedMonths(2025, march)).toBe(12);
+  });
+
+  test('a future year has not started', () => {
+    expect(elapsedMonths(2027, march)).toBe(0);
+  });
+
+  test('January of the current year counts as one month, not zero', () => {
+    expect(elapsedMonths(2026, new Date('2026-01-01T00:00:00'))).toBe(1);
+  });
+});
+
+describe('goalProgress', () => {
+  const march = new Date('2026-03-15T12:00:00');
+  const fullYear = { id: 'f1', name: 'Odmor', amounts: Array(12).fill(10000) };
+
+  // The bug this function exists to fix: the plan for the whole year used to be
+  // reported as money already saved.
+  test('only months up to and including the current one count as saved', () => {
+    const { saved, pct } = goalProgress(fullYear, 120000, 2026, march);
+    expect(saved).toBe(30000);
+    expect(pct).toBe(25);
+  });
+
+  test('the full year is still reported as planned', () => {
+    const { planned, plannedPct } = goalProgress(fullYear, 120000, 2026, march);
+    expect(planned).toBe(120000);
+    expect(plannedPct).toBe(100);
+  });
+
+  test('a filled-in plan does not read as saved in January', () => {
+    const jan = new Date('2026-01-05T00:00:00');
+    expect(goalProgress(fullYear, 120000, 2026, jan).pct).toBeCloseTo(8.33, 1);
+  });
+
+  test('a past year counts every month', () => {
+    expect(goalProgress(fullYear, 120000, 2025, march).saved).toBe(120000);
+  });
+
+  test('a future year has nothing saved but keeps its plan', () => {
+    const { saved, pct, planned } = goalProgress(fullYear, 120000, 2027, march);
+    expect(saved).toBe(0);
+    expect(pct).toBe(0);
+    expect(planned).toBe(120000);
+  });
+
+  test('null months are "not set" and add nothing to either total', () => {
+    const sparse = { amounts: [10000, null, 5000, null, null, null, null, null, null, null, null, null] };
+    const { saved, planned } = goalProgress(sparse, 100000, 2026, march);
+    expect(saved).toBe(15000);
+    expect(planned).toBe(15000);
+  });
+
+  test('progress is capped at 100% when the plan overshoots the target', () => {
+    expect(goalProgress(fullYear, 10000, 2025, march).pct).toBe(100);
+  });
+
+  test('a zero or missing target reports 0% rather than Infinity', () => {
+    expect(goalProgress(fullYear, 0, 2025, march).pct).toBe(0);
+    expect(goalProgress(fullYear, undefined, 2025, march).pct).toBe(0);
+  });
+
+  test('a missing fund is handled without throwing', () => {
+    expect(goalProgress(undefined, 50000, 2026, march)).toMatchObject({ saved: 0, planned: 0, pct: 0 });
   });
 });

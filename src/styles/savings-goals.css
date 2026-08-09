@@ -21,8 +21,19 @@
 .goal-item__name { font-weight: 600; font-size: 14px; }
 .goal-item__fund { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 .goal-item__amounts { font-size: 12px; color: var(--text-muted); margin-top: 5px; font-variant-numeric: tabular-nums; }
-.goal-bar { height: 7px; background: var(--border); border-radius: 99px; overflow: hidden; }
-.goal-bar__fill { height: 100%; border-radius: 99px; transition: width .4s ease; }
+.goal-item__plan { font-size: 11px; color: var(--text-muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.goal-bar { position: relative; height: 7px; background: var(--border); border-radius: 99px; overflow: hidden; }
+/* The year's full plan, behind the saved amount — what the bar used to show. */
+.goal-bar__plan {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--soft);
+  transition: width .4s ease;
+}
+.goal-bar__fill { position: relative; height: 100%; border-radius: 99px; transition: width .4s ease; }
 .goal-bar__fill--done    { background: var(--success); }
 .goal-bar__fill--near    { background: var(--primary); }
 .goal-bar__fill--partial { background: var(--warning); }

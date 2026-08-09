@@ -108,7 +108,7 @@ describe('SavingsGoals — goal display', () => {
 
   test('calculates progress from linked budget fund', () => {
     renderGoals({ savingsGoals: [linkedGoal], budget: BUDGET });
-    // fund has 3 months × 10000 = 30000, target = 30000 → 100%
+    // 2025 is a past year, so all twelve months count: 3 × 10000 = 30000 of 30000 → 100%
     expect(screen.getByText(/100%/)).toBeInTheDocument();
   });
 
@@ -124,6 +124,62 @@ describe('SavingsGoals — goal display', () => {
     await user.click(screen.getByRole('button', { name: /obriši cilj: peni fond/i }));
     expect(deleteSavingsGoal).toHaveBeenCalledWith('g1');
     expect(deleteSavingsGoal).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Progress is "saved so far", not "planned for the year" — a fund's twelve
+// amounts are a plan, and summing all of them used to report a goal as fully
+// saved on the 1st of January.
+describe('SavingsGoals — progress measures elapsed months', () => {
+  const CUR_FUND = 'fund-2026';
+  const PLANNED_YEAR = {
+    2026: {
+      income: { plata: Array(12).fill(null), bonus: Array(12).fill(null) },
+      funds: [{ id: CUR_FUND, name: 'Letovanje', amounts: Array(12).fill(10000) }],
+    },
+  };
+  const goal = { id: 'g3', name: 'Letovanje', target: 120000, fundId: CUR_FUND, year: 2026 };
+
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-03-15T12:00:00'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test('counts only the months that have already happened', () => {
+    renderGoals({ savingsGoals: [goal], budget: PLANNED_YEAR });
+    // Jan–Mar of 12 × 10.000 = 30.000 of a 120.000 target.
+    expect(screen.getByText(/Ušteđeno: 30\.000 RSD \/ 120\.000 RSD \(25%\)/)).toBeInTheDocument();
+  });
+
+  test('a fully filled-in plan does not read as 100% saved in March', () => {
+    renderGoals({ savingsGoals: [goal], budget: PLANNED_YEAR });
+    // The plan line is allowed to say 100% — the saved line is not.
+    expect(screen.queryByText(/Ušteđeno:.*100%/)).not.toBeInTheDocument();
+  });
+
+  test('the rest of the year is still shown, labelled as a plan', () => {
+    renderGoals({ savingsGoals: [goal], budget: PLANNED_YEAR });
+    expect(screen.getByText(/Po planu do kraja 2026: 120\.000 RSD \(100%\)/)).toBeInTheDocument();
+  });
+
+  test('a past year counts every month, so the plan line is dropped', () => {
+    renderGoals({ savingsGoals: [{ ...goal, fundId: FUND_ID, year: 2025 }], budget: BUDGET });
+    expect(screen.queryByText(/po planu do kraja/i)).not.toBeInTheDocument();
+  });
+
+  test('the bar is a progressbar reporting the saved amount', () => {
+    renderGoals({ savingsGoals: [goal], budget: PLANNED_YEAR });
+    const bar = screen.getByRole('progressbar', { name: /napredak: letovanje/i });
+    expect(bar).toHaveAttribute('aria-valuenow', '25');
+    expect(bar).toHaveAttribute('aria-valuetext', expect.stringContaining('Ušteđeno 30.000 RSD'));
+  });
+
+  test('an unlinked goal says why it sits at 0%', () => {
+    renderGoals({ savingsGoals: [{ id: 'g4', name: 'Peni fond', target: 50000, fundId: null, year: null }] });
+    expect(screen.getByText(/nije povezan sa fondom/i)).toBeInTheDocument();
   });
 });
 

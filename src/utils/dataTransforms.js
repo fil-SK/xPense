@@ -89,6 +89,39 @@ export function applyExpenseDeletion(data, id) {
   };
 }
 
+// How many of a year's twelve months have already happened, counting the
+// current one. A past year is fully elapsed, a future year not at all.
+export function elapsedMonths(year, now = new Date()) {
+  const curYear = now.getFullYear();
+  if (year < curYear) return 12;
+  if (year > curYear) return 0;
+  return now.getMonth() + 1;
+}
+// Progress on a savings goal linked to a budget fund.
+//
+// A fund's twelve amounts are a *plan*, so summing all of them answers "how
+// much will this fund hold in December?" — not "how much is saved?". Filling in
+// the year made every goal read 100% on the 1st of January. Only the months
+// that have already happened count toward `saved`; the whole year stays
+// available as `planned` so the plan is shown rather than silently dropped.
+//
+// The current month counts as saved: that month's allocation is set aside
+// during it, and excluding it would park every goal at 0% for a month.
+// `null` months are "not set" and contribute nothing to either total.
+export function goalProgress(fund, target, year, now = new Date()) {
+  const amounts = fund?.amounts ?? [];
+  const elapsed = elapsedMonths(year, now);
+  let saved = 0;
+  let planned = 0;
+  amounts.forEach((v, i) => {
+    const amount = Number(v) || 0;
+    planned += amount;
+    if (i < elapsed) saved += amount;
+  });
+  const toPct = (v) => (target > 0 ? Math.min(100, (v / target) * 100) : 0);
+  return { saved, planned, pct: toPct(saved), plannedPct: toPct(planned), elapsed };
+}
+
 export function applyBudgetCopy(data, fromYear, toYear) {
   const source = data.budget?.[fromYear];
   if (!source) return data;

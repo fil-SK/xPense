@@ -1,6 +1,7 @@
 import { useState, useId } from 'react';
 import { useApp } from '../App.jsx';
 import { formatAmount } from '../utils/helpers.js';
+import { goalProgress } from '../utils/dataTransforms.js';
 
 function getBarClass(pct) {
   if (pct >= 100) return 'goal-bar__fill--done';
@@ -29,13 +30,14 @@ export default function SavingsGoals() {
 
   const availableFunds = data.budget?.[goalYear]?.funds ?? [];
 
+  const NO_FUND = { saved: 0, planned: 0, pct: 0, plannedPct: 0, elapsed: 0 };
+
+  // Progress is "saved so far", not "planned for the year" — see goalProgress.
   function getProgress(goal) {
-    if (!goal.fundId || !goal.year) return { saved: 0, pct: 0 };
+    if (!goal.fundId || !goal.year) return NO_FUND;
     const fund = data.budget?.[goal.year]?.funds?.find((f) => f.id === goal.fundId);
-    if (!fund) return { saved: 0, pct: 0 };
-    const saved = fund.amounts.reduce((s, v) => s + (v ?? 0), 0);
-    const pct = goal.target > 0 ? Math.min(100, (saved / goal.target) * 100) : 0;
-    return { saved, pct };
+    if (!fund) return NO_FUND;
+    return goalProgress(fund, goal.target, goal.year);
   }
 
   function openAdd() {
@@ -160,10 +162,13 @@ export default function SavingsGoals() {
       {goals.length > 0 ? (
         <div className="goal-list">
           {goals.map((goal) => {
-            const { saved, pct } = getProgress(goal);
+            const { saved, planned, pct, plannedPct } = getProgress(goal);
             const linkedFund = goal.fundId && goal.year
               ? data.budget?.[goal.year]?.funds?.find((f) => f.id === goal.fundId)
               : null;
+            // The rest of the year's plan, shown as a ghost segment behind the
+            // bar so the number that used to be the progress is still visible.
+            const showPlan = !!linkedFund && planned > saved;
             return (
               <div key={goal.id} className="goal-item">
                 <div className="goal-item__head">
@@ -193,12 +198,33 @@ export default function SavingsGoals() {
                     </button>
                   </div>
                 </div>
-                <div className="goal-bar">
+                <div
+                  className="goal-bar"
+                  role="progressbar"
+                  aria-label={`Napredak: ${goal.name}`}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(pct)}
+                  aria-valuetext={`Ušteđeno ${formatAmount(saved)} od ${formatAmount(goal.target)} (${Math.round(pct)}%)`}
+                >
+                  {showPlan && (
+                    <div className="goal-bar__plan" style={{ width: `${plannedPct}%` }} />
+                  )}
                   <div className={`goal-bar__fill ${getBarClass(pct)}`} style={{ width: `${pct}%` }} />
                 </div>
                 <div className="goal-item__amounts">
-                  {formatAmount(saved)} / {formatAmount(goal.target)} ({Math.round(pct)}%)
+                  Ušteđeno: {formatAmount(saved)} / {formatAmount(goal.target)} ({Math.round(pct)}%)
                 </div>
+                {showPlan && (
+                  <div className="goal-item__plan">
+                    Po planu do kraja {goal.year}: {formatAmount(planned)} ({Math.round(plannedPct)}%)
+                  </div>
+                )}
+                {!linkedFund && (
+                  <div className="goal-item__plan">
+                    Nije povezan sa fondom — napredak se ne prati.
+                  </div>
+                )}
               </div>
             );
           })}
