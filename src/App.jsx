@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback, useRef, createContext, useContext } from 'react';
-import { loadData, saveData, hasStoredData, withDefaults } from './utils/storage.js';
 import {
-  generateRecurringExpenses, applyBudgetCopy, isEmptyData, applyExpenseDeletion,
-} from './utils/dataTransforms.js';
+  useState, useReducer, useEffect, useCallback, useMemo, useRef,
+  createContext, useContext,
+} from 'react';
+import { loadData, saveData, hasStoredData, withDefaults } from './utils/storage.js';
+import { generateRecurringExpenses, isEmptyData } from './utils/dataTransforms.js';
+import { dataReducer } from './state/dataReducer.js';
 import {
   getStoredHandle, checkPermission, grantPermission,
   readFromFile, writeToFile, pickFile,
@@ -18,8 +20,10 @@ import GlobalSearch from './components/GlobalSearch.jsx';
 export const AppContext = createContext(null);
 export const useApp = () => useContext(AppContext);
 
+const newId = () => crypto.randomUUID();
+
 export default function App() {
-  const [data, setData] = useState(() => loadData());
+  const [data, dispatch] = useReducer(dataReducer, undefined, loadData);
   const [view, setView] = useState('home');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -40,6 +44,7 @@ export default function App() {
   const [bootState, setBootState] = useState(() => (hasStoredData() ? 'ready' : 'recovering'));
   const recoveryPendingRef = useRef(bootState === 'recovering');
 
+  // Lets async callbacks read the latest data without depending on it.
   const dataRef = useRef(data);
   useEffect(() => { dataRef.current = data; }, [data]);
 
@@ -53,6 +58,8 @@ export default function App() {
   }, []);
 
   useEffect(() => () => clearTimeout(toastTimerRef.current), []);
+
+  // ── Persistence ───────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (bootState !== 'ready') return;
@@ -75,7 +82,7 @@ export default function App() {
     }
     // Never replace work the user has already entered while we were reading.
     if (!isEmptyData(dataRef.current)) return false;
-    setData(withDefaults(fileData));
+    dispatch({ type: 'data/replace', payload: withDefaults(fileData) });
     return true;
   }, []);
 
@@ -150,17 +157,20 @@ export default function App() {
     }
   }, [darkMode]);
 
+  // Fills in any month a recurring template still owes. Ids are minted here so
+  // the reducer handler stays pure. Runs on every startup, which is why
+  // deletions are remembered on the template (see skippedMonths).
   useEffect(() => {
     if (!data.recurrings?.length) return;
-    const now = new Date();
-    setData((d) => {
-      if (!d.recurrings?.length) return d;
-      const generated = generateRecurringExpenses(d.recurrings, d.expenses, now);
-      if (generated.length === 0) return d;
-      const withIds = generated.map((e) => ({ ...e, id: crypto.randomUUID() }));
-      return { ...d, expenses: [...d.expenses, ...withIds] };
+    const generated = generateRecurringExpenses(data.recurrings, data.expenses, new Date());
+    if (generated.length === 0) return;
+    dispatch({
+      type: 'expense/addGenerated',
+      payload: generated.map((e) => ({ ...e, id: newId() })),
     });
   }, [data.recurrings]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Autosave wiring ───────────────────────────────────────────────────────
 
   const setupAutosave = useCallback(async () => {
     try {
@@ -202,6 +212,8 @@ export default function App() {
     }
   }, [showToast, recoverFromFile]);
 
+  // ── Navigation and theme ──────────────────────────────────────────────────
+
   const navigateTo = useCallback((v, year, month) => {
     setPrevView(prevViewRef.current);
     prevViewRef.current = v;
@@ -210,302 +222,141 @@ export default function App() {
     if (month != null) setSelectedMonth(month);
   }, []);
 
-  const addExpense = useCallback((expense) => {
-    setData((d) => ({
-      ...d,
-      expenses: [...d.expenses, { ...expense, id: crypto.randomUUID() }],
-    }));
-    showToast('Trošak dodat.');
-  }, [showToast]);
+  const toggleDarkMode = useCallback(() => setDarkMode((v) => !v), []);
 
-  const updateExpense = useCallback((id, updates) => {
-    setData((d) => ({
-      ...d,
-      expenses: d.expenses.map((e) => (e.id === id ? { ...e, ...updates } : e)),
-    }));
-    showToast('Trošak izmenjen.');
-  }, [showToast]);
+  // ── Actions ───────────────────────────────────────────────────────────────
+  // Thin wrappers over dispatch: they mint ids, raise toasts, and nothing else.
+  // `dispatch` and `showToast` are both stable, so this object is built once —
+  // which is what keeps the context value from changing on every render.
 
-  const deleteExpense = useCallback((id) => {
-    const wasGenerated = !!dataRef.current.expenses.find((e) => e.id === id)?.recurringId;
-    setData((d) => applyExpenseDeletion(d, id));
-    showToast(
-      wasGenerated ? 'Trošak obrisan — neće biti ponovo kreiran.' : 'Trošak obrisan.',
-      'danger'
-    );
-  }, [showToast]);
-
-  const addCategory = useCallback((name) => {
-    setData((d) => ({ ...d, categories: [...d.categories, name] }));
-    showToast(`Kategorija "${name}" dodata.`);
-  }, [showToast]);
-
-  const updateCategory = useCallback((oldName, newName) => {
-    setData((d) => ({
-      ...d,
-      categories: d.categories.map((c) => (c === oldName ? newName : c)),
-      categoryGroups: (d.categoryGroups ?? []).map((g) => ({
-        ...g, categories: g.categories.map((c) => (c === oldName ? newName : c)),
-      })),
-      expenses: d.expenses.map((e) =>
-        e.category === oldName ? { ...e, category: newName } : e
-      ),
-    }));
-    showToast(`Kategorija preimenovana.`);
-  }, [showToast]);
-
-  const deleteCategory = useCallback((name) => {
-    setData((d) => ({
-      ...d,
-      categories: d.categories.filter((c) => c !== name),
-      categoryGroups: (d.categoryGroups ?? []).map((g) => ({
-        ...g, categories: g.categories.filter((c) => c !== name),
-      })),
-      expenses: d.expenses.map((e) =>
-        e.category === name ? { ...e, category: 'Ostalo' } : e
-      ),
-    }));
-    showToast(`Kategorija obrisana.`, 'danger');
-  }, [showToast]);
-
-  const archiveCategory = useCallback((name) => {
-    setData((d) => ({
-      ...d,
-      categories: d.categories.filter((c) => c !== name),
-      categoryGroups: (d.categoryGroups ?? []).map((g) => ({
-        ...g, categories: g.categories.filter((c) => c !== name),
-      })),
-    }));
-    showToast(`Kategorija "${name}" arhivirana.`);
-  }, [showToast]);
-
-  const addCategoryGroup = useCallback((name) => {
-    setData((d) => ({
-      ...d,
-      categoryGroups: [...(d.categoryGroups ?? []), { id: crypto.randomUUID(), name, categories: [] }],
-    }));
-  }, []);
-
-  const renameCategoryGroup = useCallback((id, name) => {
-    setData((d) => ({
-      ...d,
-      categoryGroups: (d.categoryGroups ?? []).map((g) => (g.id === id ? { ...g, name } : g)),
-    }));
-  }, []);
-
-  const deleteCategoryGroup = useCallback((id) => {
-    setData((d) => ({
-      ...d,
-      categoryGroups: (d.categoryGroups ?? []).filter((g) => g.id !== id),
-    }));
-  }, []);
-
-  const updateCategoryGroupMembers = useCallback((groupId, members) => {
-    setData((d) => ({
-      ...d,
-      categoryGroups: (d.categoryGroups ?? []).map((g) =>
-        g.id === groupId
-          ? { ...g, categories: members }
-          : { ...g, categories: g.categories.filter((c) => !members.includes(c)) }
-      ),
-    }));
-  }, []);
-
-  const importData = useCallback((imported, { skipped = 0 } = {}) => {
-    // Import replaces everything, so keep the previous state reachable for as
-    // long as the toast is up.
-    const snapshot = dataRef.current;
-    setData(imported);
-    showToast(
-      skipped > 0
-        ? `Podaci uvezeni — ${skipped} stavki preskočeno.`
-        : 'Podaci uvezeni uspešno.',
-      'success',
-      {
-        action: {
-          label: 'Poništi',
-          onClick: () => {
-            setData(snapshot);
-            showToast('Uvoz poništen.', 'danger');
-          },
-        },
-      }
-    );
-  }, [showToast]);
-
-  const importBudgetData = useCallback((budgetData) => {
-    setData((d) => ({ ...d, budget: { ...d.budget, ...budgetData } }));
-    showToast('Budžet uvezen uspešno.');
-  }, [showToast]);
-
-  function getYearBudget(data, year) {
-    return data.budget?.[year] ?? {
-      income: { plata: Array(12).fill(null), bonus: Array(12).fill(null) },
-      funds: [],
-    };
-  }
-
-  const updateBudgetIncome = useCallback((year, field, monthIdx, value) => {
-    setData((d) => {
-      const yb = getYearBudget(d, year);
-      const newAmounts = yb.income[field].map((v, i) => (i === monthIdx ? value : v));
-      return {
-        ...d,
-        budget: {
-          ...d.budget,
-          [year]: { ...yb, income: { ...yb.income, [field]: newAmounts } },
-        },
-      };
-    });
-  }, []);
-
-  const updateBudgetFund = useCallback((year, fundId, monthIdx, value) => {
-    setData((d) => {
-      const yb = getYearBudget(d, year);
-      const newFunds = yb.funds.map((f) =>
-        f.id === fundId
-          ? { ...f, amounts: f.amounts.map((v, i) => (i === monthIdx ? value : v)) }
-          : f
+  const actions = useMemo(() => ({
+    addExpense: (expense) => {
+      dispatch({ type: 'expense/add', payload: { ...expense, id: newId() } });
+      showToast('Trošak dodat.');
+    },
+    updateExpense: (id, updates) => {
+      dispatch({ type: 'expense/update', payload: { id, updates } });
+      showToast('Trošak izmenjen.');
+    },
+    deleteExpense: (id) => {
+      const wasGenerated = !!dataRef.current.expenses.find((e) => e.id === id)?.recurringId;
+      dispatch({ type: 'expense/delete', payload: { id } });
+      showToast(
+        wasGenerated ? 'Trošak obrisan — neće biti ponovo kreiran.' : 'Trošak obrisan.',
+        'danger'
       );
-      return { ...d, budget: { ...d.budget, [year]: { ...yb, funds: newFunds } } };
-    });
-  }, []);
+    },
 
-  const addBudgetFund = useCallback((year, name) => {
-    setData((d) => {
-      const yb = getYearBudget(d, year);
-      const newFund = { id: crypto.randomUUID(), name, amounts: Array(12).fill(null) };
-      return {
-        ...d,
-        budget: { ...d.budget, [year]: { ...yb, funds: [...yb.funds, newFund] } },
-      };
-    });
-  }, []);
+    addRecurring: (recurring) =>
+      dispatch({ type: 'recurring/add', payload: { ...recurring, id: newId() } }),
+    deleteRecurring: (id) => {
+      dispatch({ type: 'recurring/delete', payload: { id } });
+      showToast('Ponavljajući trošak uklonjen.', 'danger');
+    },
 
-  const removeBudgetFund = useCallback((year, fundId) => {
-    setData((d) => {
-      const yb = getYearBudget(d, year);
-      return {
-        ...d,
-        budget: {
-          ...d.budget,
-          [year]: { ...yb, funds: yb.funds.filter((f) => f.id !== fundId) },
-        },
-      };
-    });
-  }, []);
+    setMonthlyNote: (year, month, text) =>
+      dispatch({ type: 'note/set', payload: { year, month, text } }),
 
-  const updateTrackingMap = useCallback((year, fundId, categories) => {
-    setData((d) => ({
-      ...d,
-      trackingMaps: {
-        ...d.trackingMaps,
-        [year]: { ...(d.trackingMaps[year] ?? {}), [fundId]: categories },
-      },
-    }));
-  }, []);
+    addCategory: (name) => {
+      dispatch({ type: 'category/add', payload: { name } });
+      showToast(`Kategorija "${name}" dodata.`);
+    },
+    updateCategory: (oldName, newName) => {
+      dispatch({ type: 'category/rename', payload: { oldName, newName } });
+      showToast('Kategorija preimenovana.');
+    },
+    deleteCategory: (name) => {
+      dispatch({ type: 'category/delete', payload: { name } });
+      showToast('Kategorija obrisana.', 'danger');
+    },
+    archiveCategory: (name) => {
+      dispatch({ type: 'category/archive', payload: { name } });
+      showToast(`Kategorija "${name}" arhivirana.`);
+    },
 
-  const reorderBudgetFunds = useCallback((year, orderedIds) => {
-    setData((d) => {
-      const yb = getYearBudget(d, year);
-      const indexed = Object.fromEntries(yb.funds.map((f) => [f.id, f]));
-      const reordered = orderedIds.map((id) => indexed[id]).filter(Boolean);
-      return { ...d, budget: { ...d.budget, [year]: { ...yb, funds: reordered } } };
-    });
-  }, []);
+    addCategoryGroup: (name) =>
+      dispatch({ type: 'group/add', payload: { id: newId(), name } }),
+    renameCategoryGroup: (id, name) =>
+      dispatch({ type: 'group/rename', payload: { id, name } }),
+    deleteCategoryGroup: (id) =>
+      dispatch({ type: 'group/delete', payload: { id } }),
+    updateCategoryGroupMembers: (groupId, members) =>
+      dispatch({ type: 'group/setMembers', payload: { groupId, members } }),
 
-  const renameBudgetFund = useCallback((year, fundId, name) => {
-    setData((d) => {
-      const yb = getYearBudget(d, year);
-      return {
-        ...d,
-        budget: {
-          ...d.budget,
-          [year]: { ...yb, funds: yb.funds.map((f) => (f.id === fundId ? { ...f, name } : f)) },
-        },
-      };
-    });
-  }, []);
+    updateBudgetIncome: (year, field, monthIdx, value) =>
+      dispatch({ type: 'budget/setIncome', payload: { year, field, monthIdx, value } }),
+    updateBudgetFund: (year, fundId, monthIdx, value) =>
+      dispatch({ type: 'budget/setFundAmount', payload: { year, fundId, monthIdx, value } }),
+    addBudgetFund: (year, name) =>
+      dispatch({
+        type: 'budget/addFund',
+        payload: { year, fund: { id: newId(), name, amounts: Array(12).fill(null) } },
+      }),
+    removeBudgetFund: (year, fundId) =>
+      dispatch({ type: 'budget/removeFund', payload: { year, fundId } }),
+    renameBudgetFund: (year, fundId, name) =>
+      dispatch({ type: 'budget/renameFund', payload: { year, fundId, name } }),
+    reorderBudgetFunds: (year, orderedIds) =>
+      dispatch({ type: 'budget/reorderFunds', payload: { year, orderedIds } }),
+    copyBudgetToYear: (fromYear, toYear) =>
+      dispatch({ type: 'budget/copyToYear', payload: { fromYear, toYear } }),
+    updateTrackingMap: (year, fundId, categories) =>
+      dispatch({ type: 'tracking/set', payload: { year, fundId, categories } }),
 
-  const copyBudgetToYear = useCallback((fromYear, toYear) => {
-    setData((d) => applyBudgetCopy(d, fromYear, toYear));
-  }, []);
+    addSavingsGoal: (goal) => {
+      dispatch({ type: 'goal/add', payload: { ...goal, id: newId() } });
+      showToast('Cilj dodat.');
+    },
+    deleteSavingsGoal: (id) => {
+      dispatch({ type: 'goal/delete', payload: { id } });
+      showToast('Cilj obrisan.', 'danger');
+    },
 
-  const setMonthlyNote = useCallback((year, month, text) => {
-    setData((d) => ({
-      ...d,
-      monthlyNotes: {
-        ...(d.monthlyNotes ?? {}),
-        [year]: { ...(d.monthlyNotes?.[year] ?? {}), [month]: text },
-      },
-    }));
-  }, []);
+    importData: (imported, { skipped = 0 } = {}) => {
+      // Import replaces everything, so keep the previous state reachable for as
+      // long as the toast is up.
+      const snapshot = dataRef.current;
+      dispatch({ type: 'data/replace', payload: imported });
+      showToast(
+        skipped > 0
+          ? `Podaci uvezeni — ${skipped} stavki preskočeno.`
+          : 'Podaci uvezeni uspešno.',
+        'success',
+        {
+          action: {
+            label: 'Poništi',
+            onClick: () => {
+              dispatch({ type: 'data/replace', payload: snapshot });
+              showToast('Uvoz poništen.', 'danger');
+            },
+          },
+        }
+      );
+    },
+    importBudgetData: (budget) => {
+      dispatch({ type: 'budget/import', payload: { budget } });
+      showToast('Budžet uvezen uspešno.');
+    },
+  }), [showToast]);
 
-  const addSavingsGoal = useCallback((goal) => {
-    setData((d) => ({
-      ...d,
-      savingsGoals: [...(d.savingsGoals ?? []), { ...goal, id: crypto.randomUUID() }],
-    }));
-    showToast('Cilj dodat.');
-  }, [showToast]);
-
-  const deleteSavingsGoal = useCallback((id) => {
-    setData((d) => ({ ...d, savingsGoals: (d.savingsGoals ?? []).filter((g) => g.id !== id) }));
-    showToast('Cilj obrisan.', 'danger');
-  }, [showToast]);
-
-  const addRecurring = useCallback((recurring) => {
-    setData((d) => ({
-      ...d,
-      recurrings: [...(d.recurrings ?? []), { ...recurring, id: crypto.randomUUID() }],
-    }));
-  }, []);
-
-  const deleteRecurring = useCallback((id) => {
-    setData((d) => ({ ...d, recurrings: d.recurrings.filter((r) => r.id !== id) }));
-    showToast('Ponavljajući trošak uklonjen.', 'danger');
-  }, [showToast]);
-
-  const ctx = {
+  const ctx = useMemo(() => ({
     data,
     view,
     prevView,
     selectedYear,
     selectedMonth,
-    navigateTo,
-    addExpense,
-    updateExpense,
-    deleteExpense,
-    addCategory,
-    updateCategory,
-    deleteCategory,
-    archiveCategory,
-    addCategoryGroup,
-    renameCategoryGroup,
-    deleteCategoryGroup,
-    updateCategoryGroupMembers,
-    importData,
-    importBudgetData,
-    showToast,
-    updateBudgetIncome,
-    updateBudgetFund,
-    addBudgetFund,
-    removeBudgetFund,
-    renameBudgetFund,
-    reorderBudgetFunds,
-    updateTrackingMap,
-    copyBudgetToYear,
-    addRecurring,
-    deleteRecurring,
-    setMonthlyNote,
-    addSavingsGoal,
-    deleteSavingsGoal,
     darkMode,
-    toggleDarkMode: () => setDarkMode((v) => !v),
     autosaveStatus,
+    navigateTo,
+    toggleDarkMode,
     setupAutosave,
     activateAutosave,
-  };
+    showToast,
+    ...actions,
+  }), [
+    data, view, prevView, selectedYear, selectedMonth, darkMode, autosaveStatus,
+    navigateTo, toggleDarkMode, setupAutosave, activateAutosave, showToast, actions,
+  ]);
 
   return (
     <AppContext.Provider value={ctx}>

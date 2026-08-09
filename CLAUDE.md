@@ -24,7 +24,7 @@ Test files live in `src/__tests__/`. Setup file is `src/test/setup.js` (clears l
 
 **Test workflow:** For every new feature or edit, write tests in the relevant file(s) before reporting done, then run `npm test` to confirm nothing is broken. If a new pure utility is added, test it in the helpers or dataTransforms suite. If a new component is added, add a `.test.jsx` file for it.
 
-**Current test files (275 tests, 17 files):**
+**Current test files (340 tests, 19 files):**
 - `helpers.test.js` — all pure functions in `utils/helpers.js`, incl. `lastDayOfMonth` / `isoDate` / `clampISODate` day-clamping and `categoryColor` stability
 - `storage.test.js` — `loadData`, `saveData`, `importJSON` (now resolves `{ data, skipped }`), `importBudget`, `buildCSVString`, `hasStoredData`, `withDefaults` (incl. expense-date repair), `validateImportData` sanitising
 - `dataTransforms.test.js` — `generateRecurringExpenses` (incl. `skippedMonths` and day clamping), `applyBudgetCopy`, `isEmptyData`, `applyExpenseDeletion` (incl. the delete→regenerate round trip)
@@ -38,6 +38,8 @@ Test files live in `src/__tests__/`. Setup file is `src/test/setup.js` (clears l
 - `Home.test.jsx` — quick-add circle button, modal open/close, removed Prethodne card, JSON import (confirm dialog appears instead of importing, confirm/cancel paths, malformed file)
 - `ImportConfirmModal.test.jsx` — replace warning, current-vs-incoming counts, loss highlighting, skipped wording, confirm/cancel/Escape
 - `App.import.test.jsx` — full import round trip through App: confirm replaces stored data, toast offers undo, undo restores every replaced expense
+- `dataReducer.test.js` — every slice handler, routing, unknown-action throw, no duplicate action types across slices, immutability of inputs
+- `App.actions.test.jsx` — scans `App.jsx` for every `type: '…'` it dispatches and asserts each is handled by a slice (component tests mock the context, so a typo would otherwise only surface at runtime), plus real add-expense and add-category flows through the live provider
 - `BudgetPanel.test.jsx` — null render, fund rows, amounts, remaining, "nije postavljeno"
 - `PreviousSpendings.test.jsx` — 12-card grid, note snippet, truncation, empty state
 - `BudgetView.test.jsx` — category chip render/count, inline panel expand/collapse, one-at-a-time, pill add/remove calls
@@ -52,6 +54,21 @@ Single-page React app with no router — navigation is purely state-based (`view
 ### State and data flow
 
 All global state lives in `App.jsx` via React Context (`AppContext`). Every component reads state and calls actions through the `useApp()` hook. There is no external state library.
+
+**`data` is a `useReducer`, not `useState`.** The reducer lives in `src/state/` and is split by domain:
+
+| File | Owns | Action prefixes |
+|---|---|---|
+| `expensesSlice.js` | expenses, recurrings, monthlyNotes | `expense/`, `recurring/`, `note/` |
+| `categoriesSlice.js` | categories, categoryGroups | `category/`, `group/` |
+| `budgetSlice.js` | budget, trackingMaps, savingsGoals | `budget/`, `tracking/`, `goal/` |
+| `dataReducer.js` | routing + `data/replace` | — |
+
+Each slice exports a `{ [type]: (data, payload) => data }` map; `dataReducer` merges them and throws on an unknown type (a silent no-op is much harder to spot than a thrown error). Slices are merged with object spread, so **two slices must never define the same action type** — `dataReducer.test.js` asserts this.
+
+**Handlers must stay pure.** Ids are minted by the action creators in `App.jsx` (`newId()`) and arrive in the payload, never generated inside a handler — that is what makes the slices testable without React and safe under StrictMode's double-invoke. The recurring-generation effect follows the same rule: it computes the entries, assigns ids, then dispatches `expense/addGenerated`.
+
+The actions object in `App.jsx` is a `useMemo` over `[showToast]` (both `dispatch` and `showToast` are stable), so it is built once. The context value is also memoized — without it, every toast appearing or disappearing re-rendered every consumer. Adding a data action means adding one handler to a slice and one thin wrapper in the actions object; the wrapper's only jobs are minting ids and raising toasts.
 
 The full data object shape:
 ```js
