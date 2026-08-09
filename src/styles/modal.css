@@ -1,0 +1,70 @@
+/* Modal shell — overlay, dialog, fixed header/footer and scrolling body.
+   Component: components/ExpenseModal.jsx, components/ImportConfirmModal.jsx.
+   The side margins on .modal__body must match .modal's padding; responsive.css
+   overrides all four together. */
+
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, .45);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 200;
+  animation: fadeIn .15s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal {
+  background: var(--bg-card);
+  border-radius: 24px;
+  box-shadow: var(--sh-lg);
+  padding: 28px 30px;
+  width: 500px;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideUp .18s ease;
+}
+@keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+.modal__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 26px; flex-shrink: 0; }
+.modal__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* bleed to the modal edge so the scrollbar hugs the border and focus rings aren't clipped */
+  margin: 0 -30px;
+  padding: 2px 30px;
+  overscroll-behavior: contain;
+}
+.modal__title { font-family: var(--font-display); font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
+.modal__close {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.modal__close:hover { color: var(--text); }
+.modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.modal__footer .btn { flex: 1; justify-content: center; padding: 14px; font-size: 14.5px; border-radius: var(--radius-sm); }

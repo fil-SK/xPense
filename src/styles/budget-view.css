@@ -1,0 +1,391 @@
+/* Component: components/BudgetView.jsx — page head, summary cards, and the
+   .bg budget grid (sticky label column, inline cells, tracking panel). */
+
+/* ── Budget view ─────────────────────────────────────────────────────────── */
+.budget {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 40px 54px 72px;
+}
+.budget__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  max-width: 1060px;
+}
+.budget__head-text { display: flex; flex-direction: column; gap: 4px; }
+.budget__title {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.budget__year-nav {
+  width: 38px;
+  height: 38px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, color .15s;
+}
+.budget__year-nav:hover { color: var(--text); }
+.budget__hint {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.budget__tools {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.budget__summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  max-width: 1060px;
+  margin: 20px 0 4px;
+}
+.budget__summary-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 22px 24px;
+}
+.budget__summary-label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+.budget__summary-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.budget__summary-value {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.budget__summary-unit { font-size: 13px; color: var(--text3); font-weight: 600; }
+@media (max-width: 720px) { .budget__summary { grid-template-columns: 1fr; } }
+
+.budget__scroll {
+  overflow-x: auto;
+  border-radius: var(--radius);
+  box-shadow: var(--sh);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+
+/* Table */
+.bg {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 900px;
+  font-size: 13px;
+}
+
+/* Sticky label column */
+.bg__label-col {
+  position: sticky;
+  left: 0;
+  background: var(--bg-card);
+  z-index: 2;
+  min-width: 160px;
+  max-width: 180px;
+}
+
+/* Header */
+.bg__th {
+  padding: 10px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--text-muted);
+  text-align: center;
+  border-bottom: 2px solid var(--border);
+  background: var(--bg-card);
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  white-space: nowrap;
+}
+.bg__th.bg__label-col { z-index: 4; text-align: left; padding-left: 16px; }
+.bg__month-head { min-width: 72px; }
+.bg__total-head { min-width: 90px; font-weight: 800; color: var(--text); }
+
+/* Current month highlight */
+.bg__col--current { background: #eef2ff !important; }
+thead .bg__col--current { background: #e0e7ff !important; }
+
+/* Section rows */
+.bg__section-row td {
+  background: var(--bg);
+  padding: 5px 16px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+}
+
+/* Data rows */
+.bg__row { transition: background .12s; }
+.bg__row:hover > td { background: var(--bg-hover); }
+.bg__row:hover > .bg__label-col { background: var(--bg-hover); }
+
+.bg__row-label {
+  padding: 0 8px 0 16px;
+  font-weight: 500;
+  color: var(--text);
+  height: 40px;
+  border-right: 1px solid var(--border);
+}
+.bg__row-label--sub {
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.bg__row-label--balance {
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: .3px;
+}
+.bg__row-label--fund {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Data cells */
+.bg__cell {
+  text-align: right;
+  padding: 0 6px;
+  border-right: 1px solid var(--border);
+  height: 40px;
+  vertical-align: middle;
+}
+
+/* Inline budget cell */
+.bgc {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  text-align: right;
+  cursor: pointer;
+  transition: background .1s;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.bgc:hover { background: var(--primary-light); }
+.bgc--filled { color: var(--text); font-weight: 500; }
+.bgc--empty { color: var(--text-muted); }
+.bgc--dimmed { opacity: .4; }
+
+/* Editing input inside cell */
+.bgc-input {
+  width: 100%;
+  padding: 5px 8px;
+  text-align: right;
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 500;
+  border: 2px solid var(--primary);
+  border-radius: var(--radius-sm);
+  outline: none;
+  background: #fff;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Computed / subtotal rows */
+.bg__subtotal-row > td {
+  background: #f8fafc;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.bg__cell--computed {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding-right: 12px;
+}
+
+/* Total column */
+.bg__total-cell {
+  text-align: right;
+  padding: 0 16px 0 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  border-left: 2px solid var(--border);
+}
+.bg__total-cell--strong {
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Fund label */
+.bg__drag-handle {
+  opacity: 0;
+  cursor: grab;
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 0 4px 0 0;
+  flex-shrink: 0;
+  line-height: 1;
+  transition: opacity .12s;
+  user-select: none;
+  touch-action: none;
+}
+.bg__drag-handle:active { cursor: grabbing; }
+.bg__row--fund:hover .bg__drag-handle { opacity: 1; }
+
+.bg__fund-name {
+  flex: 1;
+  cursor: default;
+  user-select: none;
+}
+.bg__fund-name-input {
+  flex: 1;
+  padding: 3px 6px;
+  font-size: 13px;
+  font-family: inherit;
+  border: 2px solid var(--primary);
+  border-radius: 6px;
+  outline: none;
+  min-width: 0;
+}
+.bg__del-btn {
+  opacity: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  color: var(--text-muted);
+  padding: 2px 5px;
+  border-radius: 4px;
+  transition: opacity .12s, color .12s, background .12s;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.bg__row--fund:hover .bg__del-btn { opacity: 1; }
+.bg__del-btn:hover { color: var(--danger); background: var(--danger-light); }
+.bg__del-btn--confirm { opacity: 1 !important; color: var(--warning) !important; }
+
+/* Category chip on fund rows */
+.bg__cat-chip {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.6;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.bg__cat-chip:hover,
+.bg__cat-chip--open {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Inline tracking panel */
+.bg__tracking-row > td {
+  padding: 0;
+  background: var(--bg);
+  border-bottom: 2px solid var(--primary-light);
+}
+/* Inset the panel from the row edges on all four sides, so the pills never sit
+   flush against the grid borders. */
+.bg__tracking-cell { padding: 14px 18px 18px; }
+.bg__tracking-panel {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+}
+.bg__tracking-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  white-space: nowrap;
+  padding-top: 6px;
+}
+.bg__tracking-pills { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; min-width: 0; }
+/* .tracking-pill carries no rules of its own — only this check mark, shown on
+   the pills of categories mapped to the fund. */
+.tracking-pill__check { font-size: 11px; }
+
+/* Add fund row */
+.bg__add-row > td { border-top: 1px dashed var(--border); }
+.bg__add-cell {
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.bg__add-input {
+  flex: 1;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  background: var(--bg);
+  color: var(--text);
+  transition: border-color .15s;
+  max-width: 280px;
+}
+.bg__add-input:focus { border-color: var(--primary); background: #fff; }
+.bg__add-input::placeholder { color: var(--text-muted); }
+
+/* Balance row */
+.bg__balance-row > td {
+  border-top: 2px solid var(--border);
+  background: var(--bg-card);
+  font-weight: 700;
+}
+.bg__balance-row > .bg__label-col { background: var(--bg-card); }
+.bg__balance-cell {
+  text-align: right;
+  padding-right: 10px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.bg__balance-cell--pos { color: var(--success); }
+.bg__balance-cell--neg { color: var(--danger); }
+.bg__balance-total { font-weight: 800; font-size: 14px; }

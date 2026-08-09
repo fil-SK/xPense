@@ -1,0 +1,96 @@
+/* Component: components/BudgetPanel.jsx — fund vs. actual rows. */
+
+/* ── Budget panel in MonthView / Home ───────────────────────────────────── */
+.bp {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 44px;
+}
+.bp__label {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  color: var(--text);
+}
+.bp__rows {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px 24px 4px;
+  box-shadow: var(--sh-sm);
+}
+
+.bp-row {
+  display: grid;
+  grid-template-columns: 9px minmax(90px, 190px) 1fr 150px auto;
+  align-items: center;
+  gap: 16px;
+  padding: 15px 0;
+  border-top: 1px solid var(--border2);
+}
+.bp-row:first-child { border-top: none; }
+
+.bp-row__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.bp-row--ok   .bp-row__dot { background: var(--success); }
+.bp-row--warn .bp-row__dot { background: var(--warning); }
+.bp-row--over .bp-row__dot { background: var(--danger); }
+.bp-row--unset .bp-row__dot { background: var(--border); }
+
+.bp-row__name {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bp-row__bar {
+  height: 7px;
+  background: var(--bg3);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.bp-row__bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width .3s ease;
+}
+.bp-row--ok   .bp-row__bar-fill { background: var(--success); }
+.bp-row--warn .bp-row__bar-fill { background: var(--warning); }
+.bp-row--over .bp-row__bar-fill { background: var(--danger); }
+
+.bp-row__amounts {
+  font-size: 13.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.bp-row__remaining {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.bp-row--ok   .bp-row__remaining { color: var(--success); }
+.bp-row--warn .bp-row__remaining { color: var(--warning); }
+.bp-row--over .bp-row__remaining { color: var(--danger); }
+.bp-row--unset .bp-row__remaining { color: var(--text-muted); }
+.bp-row__unset {
+  font-size: 13px;
+  color: var(--text3);
+  grid-column: 3 / -1;
+  text-align: right;
+}

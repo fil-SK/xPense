@@ -1,0 +1,73 @@
+/* Shared pieces with no single owner: .card, the .section-head row used by
+   Home / MonthView / PreviousSpendings / BudgetView, and small utilities. */
+
+/* ── Cards ── */
+.card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  box-shadow: var(--sh);
+  border: 1px solid var(--border);
+}
+
+/* Section headers used across Home / Month / Previous / Budget */
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+.section-head__title {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  color: var(--text);
+}
+.section-head__sub { color: var(--text3); font-size: 13px; margin-top: 2px; }
+.section-head__link {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.section-head__link:hover { opacity: .8; }
+.section-head__toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 700;
+  font-family: inherit;
+  transition: filter .15s;
+  white-space: nowrap;
+}
+.section-head__toggle:hover { filter: brightness(1.08); }
+.section-head__toggle--active { background: var(--soft); border-color: var(--primary); color: var(--primary); }
+
+.section-block { margin-bottom: 44px; }
+
+/* ── Misc ── */
+.divider { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+.text-muted { color: var(--text-muted); }
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+.badge--primary { background: var(--primary-light); color: var(--primary); }

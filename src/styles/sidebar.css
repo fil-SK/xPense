@@ -1,0 +1,99 @@
+/* Sidebar chrome: logo, search trigger, nav container, footer tools.
+   Component: components/Header.jsx. */
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 250px;
+  flex: none;
+  height: 100vh;
+  overflow-y: auto;
+  border-right: 1px solid var(--border2);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 18px 20px;
+  background: var(--sidebar-bg);
+}
+.sidebar__logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 8px 26px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  text-align: left;
+  font-family: inherit;
+}
+.sidebar__logo-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: linear-gradient(140deg, var(--primary), var(--accent2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  font-size: 17px;
+  flex-shrink: 0;
+}
+.sidebar__logo-text {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: var(--text);
+}
+.sidebar__search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 22px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: border-color .15s;
+}
+.sidebar__search:hover { border-color: var(--primary); color: var(--text); }
+.sidebar__search input {
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 13.5px;
+  width: 100%;
+  cursor: pointer;
+  font-family: inherit;
+}
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.sidebar__footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
+}
+.sidebar__tools { display: flex; gap: 8px; }
+.sidebar__tool-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  transition: color .15s, border-color .15s;
+}
+.sidebar__tool-btn:hover { color: var(--text); border-color: var(--primary); }

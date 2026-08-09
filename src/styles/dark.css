@@ -1,0 +1,65 @@
+/* Dark palette and the overrides that cannot be expressed as a variable swap.
+   Must load last: several budget-grid rules here are !important and win only
+   on source order. html.dark mirrors :root in tokens.css — update both. */
+
+/* ── Dark mode — xPense design palette ──────────────────────────────────── */
+html.dark {
+  --bg: #0e1411;
+  --bg-card: #161e1a;
+  --bg-hover: #1a2320;
+  --bg3: #212b25;
+  --sidebar-bg: #121a15;
+  --border: #2b352e;
+  --border2: #222b26;
+  --text: #eef3ef;
+  --text-muted: #95a29b;
+  --text3: #5c6961;
+  --primary: #2bd47c;
+  --primary-dark: #1fae86;
+  --accent2: #1fae86;
+  --primary-light: rgba(43,212,124,.16);
+  --soft: rgba(43,212,124,.16);
+  --danger: #e2705a;
+  --danger-light: rgba(226,112,90,.16);
+  --success: #2bd47c;
+  --success-light: rgba(43,212,124,.16);
+  --warning: #e6b24e;
+  --warning-light: rgba(230,178,78,.16);
+  --sh-sm: 0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
+  --sh: 0 4px 12px rgba(0,0,0,.4), 0 2px 4px rgba(0,0,0,.3);
+  --sh-lg: 0 24px 64px rgba(0,0,0,.55);
+  --scrollbar-thumb: #33403a;
+  --scrollbar-thumb-hover: #4a5a51;
+}
+html.dark .btn--primary,
+html.dark .home__add-btn { color: #08120c; }
+html.dark .sidebar__logo-mark { color: #08120c; }
+
+/* Budget grid: hardcoded column highlight colors */
+html.dark .bg__col--current { background: rgba(43,212,124,.07) !important; }
+html.dark thead .bg__col--current { background: rgba(43,212,124,.14) !important; }
+html.dark .bg__subtotal-row > td { background: rgba(255,255,255,.02); }
+html.dark .bg__section-row td { background: var(--bg3); }
+html.dark .bg__tracking-row > td { background: var(--bg-card); }
+/* The row behind it is already --bg-card in dark, so lift the panel a step
+   instead of painting it the same colour. */
+html.dark .bg__tracking-panel { background: var(--bg3); }
+
+/* Inputs inside budget grid */
+html.dark .bgc-input,
+html.dark .bg__fund-name-input,
+html.dark .bg__add-input { background: var(--bg); color: var(--text); }
+html.dark .bg__add-input:focus { background: var(--bg-card); }
+html.dark .bgc:hover { background: var(--soft); }
+
+/* Recharts tooltips */
+html.dark .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+/* Category manager inline input */
+html.dark input[type="text"] { color-scheme: dark; }
+html.dark select { color-scheme: dark; }
+html.dark input[type="date"] { color-scheme: dark; }

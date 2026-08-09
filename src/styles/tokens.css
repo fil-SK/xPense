@@ -1,0 +1,73 @@
+/* Design tokens, reset, global scrollbars, body.
+   The light palette lives here; the dark overrides live in dark.css. */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f1f5f9;
+  --bg-card: #ffffff;
+  --bg-hover: #f8fafc;
+  --primary: #6366f1;
+  --primary-light: #e0e7ff;
+  --primary-dark: #4f46e5;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --border: #e2e8f0;
+  --danger: #ef4444;
+  --danger-light: #fee2e2;
+  --success: #10b981;
+  --success-light: #d1fae5;
+  --warning: #f59e0b;
+  --warning-light: #fef3c7;
+  --sh-sm: 0 1px 3px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.04);
+  --sh: 0 4px 12px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.04);
+  --sh-lg: 0 10px 24px rgba(0,0,0,.09), 0 4px 8px rgba(0,0,0,.04);
+  --radius: 20px;
+  --radius-sm: 12px;
+
+  /* xPense design tokens (see Desktop/design/xPense.dc.html) */
+  --bg3: #eef1f6;
+  --border2: #eaeef3;
+  --text3: #94a3b8;
+  --soft: rgba(99,102,241,.12);
+  --accent2: #4f46e5;
+  --sidebar-bg: #f8fafc;
+  --font-display: 'Sora', system-ui, -apple-system, sans-serif;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
+}
+
+/* ── Scrollbars ──
+   Replaces the OS default (a bright grey slab on Windows) everywhere the app
+   scrolls: the main column, the sidebar, the modal body, the budget grid.
+   Chrome 121+ honours the standard properties and ignores the ::-webkit-*
+   rules below; older Chromium uses the ::-webkit-* rules. Both are themed, so
+   either path matches the app. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+  /* transparent border + padding-box clip slims the thumb without shrinking
+     the hit area */
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-corner { background: transparent; }
+
+body {
+  font-family: var(--font-display), sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.5;
+}

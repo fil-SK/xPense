@@ -1,0 +1,67 @@
+/* Component: components/PreviousSpendings.jsx — year tabs, month card grid,
+   note snippet. */
+
+/* ── Previous Spendings ── */
+.prev-header { display: flex; align-items: center; gap: 16px; margin-bottom: 6px; flex-wrap: wrap; }
+.prev-header__title { font-family: var(--font-display); font-size: 32px; font-weight: 700; letter-spacing: -.02em; }
+.year-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.year-tab {
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1.5px solid var(--border);
+  background: var(--bg-card);
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all .13s;
+}
+.year-tab--active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.year-tab:hover:not(.year-tab--active) { background: var(--bg-hover); }
+
+.months-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+@media (max-width: 640px) { .months-grid { grid-template-columns: 1fr; } }
+.month-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px 24px;
+  cursor: pointer;
+  transition: all .15s;
+  box-shadow: var(--sh-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.month-card:hover { border-color: var(--primary); box-shadow: var(--sh); }
+.month-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.month-card__name { font-weight: 700; font-size: 16px; }
+.month-card__total-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; }
+.month-card__total { font-family: var(--font-display); font-size: 30px; font-weight: 800; letter-spacing: -.02em; color: var(--text); font-variant-numeric: tabular-nums; }
+.month-card__unit { font-size: 12px; color: var(--text3); font-weight: 600; margin-left: 6px; }
+.month-card__count { font-size: 12.5px; color: var(--text3); margin-top: 2px; }
+.month-card__bar { height: 4px; background: var(--bg3); border-radius: 99px; overflow: hidden; }
+.month-card__bar-fill { height: 100%; background: var(--primary); border-radius: 99px; }
+.month-card__delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.month-card__delta--up { background: var(--warning-light); color: var(--warning); }
+.month-card__delta--down { background: var(--soft); color: var(--primary); }
+
+/* ── Month card note snippet ──────────────────────────────────────────────── */
+.month-card__note {
+  margin-top: 5px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

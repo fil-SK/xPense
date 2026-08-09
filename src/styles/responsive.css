@@ -1,0 +1,16 @@
+/* Cross-component media queries. Must load after every file it narrows —
+   home.css, forms.css and modal.css — so keep it second-to-last. */
+
+@media (max-width: 540px) {
+  .home__actions { grid-template-columns: 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+  .modal { padding: 20px 16px; }
+  .modal__body { margin: 0 -16px; padding: 2px 16px; }
+  .modal__header { margin-bottom: 18px; }
+}
+@media (max-height: 640px) {
+  .modal { padding: 18px 22px; }
+  .modal__body { margin: 0 -22px; padding: 2px 22px; }
+  .modal__header { margin-bottom: 16px; }
+  .modal__title { font-size: 20px; }
+}

@@ -24,7 +24,7 @@ Test files live in `src/__tests__/`. Setup file is `src/test/setup.js` (clears l
 
 **Test workflow:** For every new feature or edit, write tests in the relevant file(s) before reporting done, then run `npm test` to confirm nothing is broken. If a new pure utility is added, test it in the helpers or dataTransforms suite. If a new component is added, add a `.test.jsx` file for it.
 
-**Current test files (340 tests, 19 files):**
+**Current test files (347 tests, 20 files):**
 - `helpers.test.js` — all pure functions in `utils/helpers.js`, incl. `lastDayOfMonth` / `isoDate` / `clampISODate` day-clamping and `categoryColor` stability
 - `storage.test.js` — `loadData`, `saveData`, `importJSON` (now resolves `{ data, skipped }`), `importBudget`, `buildCSVString`, `hasStoredData`, `withDefaults` (incl. expense-date repair), `validateImportData` sanitising
 - `dataTransforms.test.js` — `generateRecurringExpenses` (incl. `skippedMonths` and day clamping), `applyBudgetCopy`, `isEmptyData`, `applyExpenseDeletion` (incl. the delete→regenerate round trip)
@@ -44,6 +44,7 @@ Test files live in `src/__tests__/`. Setup file is `src/test/setup.js` (clears l
 - `PreviousSpendings.test.jsx` — 12-card grid, note snippet, truncation, empty state
 - `BudgetView.test.jsx` — category chip render/count, inline panel expand/collapse, one-at-a-time, pill add/remove calls
 - `CategoryManager.test.jsx` — archive vs delete two-choice confirm, usage count, rename, add, duplicate guard; Grupe tab (add/delete group, expand + checkboxes, membership toggle, rename, cross-group hint)
+- `styles.test.js` — scans `index.css` and `src/styles/`: index.css declares no rules, every style file is imported exactly once, and the three order-critical positions hold (`tokens.css` first, `responsive.css` after what it narrows, `dark.css` last). Also checks `dark.css` defines no variable missing from the light palette. Nothing renders CSS in tests, so an unimported file or a bad load order would otherwise only show up in the browser.
 
 **Context wrapper for component tests:** Import `AppContext` from `App.jsx` and wrap with `<AppContext.Provider value={mockCtx}>`. The mock context needs `data`, `navigateTo`, and whichever action callbacks the component uses — see existing test files for the pattern.
 
@@ -170,9 +171,18 @@ Known edge: editing a generated expense's date into a different month leaves the
 
 ### Styling
 
-All styles are in `src/index.css` — one flat file, BEM-ish class names per component (`.budget__*`, `.bg__*`, `.cat-*`, `.bp-*`, `.gsearch__*`, `.goal-*`, etc.). Dark mode uses `html.dark` class toggled on `document.documentElement`; CSS variables are overridden in the `html.dark {}` block at the bottom of the file. Always use `var(--text)`, `var(--bg-card)`, etc. on new inputs/elements so they respect the theme automatically.
+Styles live in **`src/styles/`, one file per component or shared concern**, stitched together by `src/index.css`. `index.css` holds no rules — only a table of contents and an ordered list of `@import`s — and stays the single entry point (`main.jsx` imports it). BEM-ish class names per component (`.budget__*`, `.bg__*`, `.cat-*`, `.bp-*`, `.gsearch__*`, `.goal-*`, etc.). Always use `var(--text)`, `var(--bg-card)`, etc. on new inputs/elements so they respect the theme automatically.
 
-Scrollbars are themed globally at the top of the file via `*` + `*::-webkit-scrollbar`, driven by `--scrollbar-thumb` / `--scrollbar-thumb-hover`. Chrome 121+ honours the standard `scrollbar-width`/`scrollbar-color` properties and ignores the `::-webkit-*` rules; older Chromium uses the `::-webkit-*` rules. Both are defined so either path stays on-theme — if you restyle one, restyle the other.
+**The import order in `index.css` is the cascade**, because Vite inlines `@import` in the order written. Three positions are load-bearing and `styles.test.js` asserts them:
+- `tokens.css` **first** — every other file reads its custom properties.
+- `responsive.css` **second-to-last** — its media queries narrow `.home__actions`, `.form-row` and `.modal` at the *same* specificity as the base rules, so it must follow `home.css` / `forms.css` / `modal.css`.
+- `dark.css` **last** — several budget-grid overrides in it are `!important` and beat the light rules only on source order.
+
+Adding a stylesheet means creating the file, appending it to the right group in `index.css`, and giving it a header comment naming the component it styles. `styles.test.js` fails on a file nobody imports, so a new file can't go silently dead.
+
+Dark mode uses an `html.dark` class toggled on `document.documentElement`; the palette is overridden in the `html.dark {}` block in `dark.css`, which mirrors `:root` in `tokens.css`. `dark.css` may only define variables that already exist in the light palette — one defined solely under `html.dark` would resolve to nothing in light mode, so `styles.test.js` checks that direction too. (`--radius`, `--radius-sm` and `--font-display` are intentionally light-only: they aren't themed.)
+
+Scrollbars are themed globally in `tokens.css` via `*` + `*::-webkit-scrollbar`, driven by `--scrollbar-thumb` / `--scrollbar-thumb-hover`. Chrome 121+ honours the standard `scrollbar-width`/`scrollbar-color` properties and ignores the `::-webkit-*` rules; older Chromium uses the `::-webkit-*` rules. Both are defined so either path stays on-theme — if you restyle one, restyle the other.
 
 **Never hardcode a hex color in a component.** The dark palette is green-primary (`--primary: #2bd47c`) while light is indigo (`#6366f1`), so a literal like `#6366f1` is not merely off-shade in dark mode — it's the wrong hue entirely. Use `var(--…)` in inline styles, or a class. Toggle buttons use `.btn--toggled` (generic) or `.section-head__toggle--active`; both resolve to `var(--soft)` / `var(--primary)`. The only legitimate literals left in components are `CHART_THEME` in `Charts.jsx` (SVG can't read CSS vars) and `color: '#fff'` on pills whose background is a saturated `CHART_COLORS` value.
 

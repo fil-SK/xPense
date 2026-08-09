@@ -1,0 +1,101 @@
+/* Form controls shared by ExpenseModal, SavingsGoals and CategoryManager:
+   labels, inputs, the category pill row, checkbox, and the recurring switch. */
+
+/* ── Form ── */
+.form-group { display: flex; flex-direction: column; gap: 9px; margin-bottom: 20px; }
+.form-group:last-of-type { margin-bottom: 0; }
+.modal__body > :last-child { margin-bottom: 0; }
+.form-label { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.form-input, .form-select, .form-textarea {
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14.5px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--bg3);
+  outline: none;
+  transition: border-color .15s;
+  width: 100%;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--primary); }
+input[type="number"].form-input {
+  text-align: right;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.form-input--error { border-color: var(--danger); }
+.form-error { font-size: 12px; color: var(--danger); margin-top: 2px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-textarea { resize: vertical; min-height: 72px; }
+
+/* ── Category pills (modal) ── */
+.cat-pills { display: flex; flex-wrap: wrap; gap: 7px; }
+.cat-pills--error { outline: 1.5px solid var(--danger); border-radius: var(--radius-sm); padding: 6px; }
+.cat-pill {
+  padding: 5px 13px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid;
+  transition: transform .1s, box-shadow .1s, opacity .1s;
+  font-family: inherit;
+  line-height: 1.4;
+}
+.cat-pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(0,0,0,.12); }
+.cat-pill:active { transform: translateY(0); }
+
+/* ── Form checkbox ────────────────────────────────────────────────────────── */
+.form-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text);
+}
+.form-check input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary); }
+
+/* ── Recurring toggle switch ── */
+.form-recurring {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 24px;
+}
+.btn-recurring {
+  width: 42px;
+  height: 25px;
+  border-radius: 13px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  cursor: pointer;
+  position: relative;
+  transition: background .15s, border-color .15s;
+  flex-shrink: 0;
+  padding: 0;
+}
+.btn-recurring::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: var(--text3);
+  transition: left .15s, background .15s;
+}
+.btn-recurring--active {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.btn-recurring--active::after { left: 20px; background: #fff; }
+.form-recurring__label { font-size: 13.5px; color: var(--text-muted); font-weight: 500; }

@@ -1,0 +1,19 @@
+/* App shell: sidebar + scrolling main column, and the .view content box. */
+
+.app { height: 100vh; display: flex; overflow: hidden; }
+
+.main {
+  flex: 1;
+  overflow-y: auto;
+  height: 100vh;
+  width: 100%;
+}
+
+.view {
+  max-width: 1060px;
+  padding: 40px 54px 72px;
+}
+
+@media (max-width: 860px) {
+  .view { padding: 24px 20px 56px; }
+}

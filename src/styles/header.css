@@ -1,0 +1,41 @@
+/* Nav buttons, separators, theme toggle and autosave indicator.
+   Component: components/Header.jsx. */
+
+.header__btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 11px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: background .15s, color .15s;
+}
+.header__btn svg { flex-shrink: 0; }
+.header__btn:hover { background: var(--bg3); color: var(--text); }
+.header__btn--active { background: var(--soft); color: var(--primary); font-weight: 700; }
+.header__sep {
+  height: 1px;
+  background: var(--border2);
+  margin: 8px 4px;
+  flex-shrink: 0;
+}
+
+/* Theme toggle button — slightly larger touch target */
+.header__theme-btn { font-size: 16px; padding: 6px 9px; }
+
+/* Autosave status indicator */
+.header__autosave { font-size: 12px; border-radius: var(--radius-sm); }
+.header__autosave--none { color: var(--text-muted); border: 1px dashed var(--border) !important; }
+.header__autosave--none:hover { border-color: var(--primary) !important; }
+.header__autosave--prompt { color: var(--warning); border: 1px solid var(--warning) !important; }
+.header__autosave--prompt:hover { background: var(--warning-light) !important; color: var(--warning) !important; }
+.header__autosave--active { padding: 6px 9px; color: var(--success); cursor: default; }
+.header__autosave--error { color: var(--danger); border: 1px solid var(--danger) !important; }
+.header__autosave--error:hover { background: var(--danger-light) !important; color: var(--danger) !important; }

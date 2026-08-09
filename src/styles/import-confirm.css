@@ -1,0 +1,35 @@
+/* Component: components/ImportConfirmModal.jsx — current-vs-incoming table. */
+
+/* ── Import confirmation ── */
+.import-warn {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.import-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.import-table th {
+  text-align: right;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 0 0 8px;
+}
+.import-table th:first-child { text-align: left; }
+.import-table td { padding: 8px 0; border-top: 1px solid var(--border); }
+.import-table__label { color: var(--text-muted); }
+.import-table__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.import-table__num--loss { color: var(--danger); }
+.import-skipped {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--warning-light);
+  color: var(--warning);
+  font-size: 13px;
+  line-height: 1.45;
+}
