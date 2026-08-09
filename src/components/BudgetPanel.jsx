@@ -1,5 +1,5 @@
 import { useApp } from '../App.jsx';
-import { getExpensesForMonth } from '../utils/helpers.js';
+import { getExpensesForMonth, getTotalAmount } from '../utils/helpers.js';
 
 const THRESHOLD_WARN = 0.9;
 
@@ -35,9 +35,9 @@ export default function BudgetPanel({ year, month }) {
         {trackedFunds.map((fund) => {
           const allocated = fund.amounts[month] ?? null;
           const mappedCats = yearMaps[fund.id] ?? [];
-          const spent = monthExpenses
-            .filter((e) => mappedCats.includes(e.category))
-            .reduce((s, e) => s + e.amount, 0);
+          const spent = getTotalAmount(
+            monthExpenses.filter((e) => mappedCats.includes(e.category))
+          );
 
           const ratio = allocated !== null ? spent / allocated : null;
           const remaining = allocated !== null ? allocated - spent : null;

@@ -57,10 +57,90 @@ describe('withDefaults', () => {
     expect(withDefaults(parsed).expenses.map((e) => e.date)).toEqual(['2026-02-28', '2025-04-30']);
   });
 
-  test('leaves well-formed expense dates alone', () => {
+  test('leaves well-formed expenses alone', () => {
     const expense = { id: '1', title: 'Ručak', date: '2025-01-15', amount: 900, category: 'Hrana' };
     const [result] = withDefaults({ expenses: [expense] }).expenses;
     expect(result).toBe(expense); // same object — no needless copy
+  });
+
+  // Amounts are normalized here so no reader has to coerce: `+` on a string
+  // concatenates, which turned per-fund spend in BudgetPanel into nonsense.
+  test('coerces string expense amounts to numbers', () => {
+    const parsed = {
+      expenses: [
+        { id: '1', title: 'A', date: '2025-01-01', amount: '800', category: 'Hrana' },
+        { id: '2', title: 'B', date: '2025-01-02', amount: '1200.50', category: 'Hrana' },
+      ],
+    };
+    const amounts = withDefaults(parsed).expenses.map((e) => e.amount);
+    expect(amounts).toEqual([800, 1200.5]);
+    amounts.forEach((a) => expect(typeof a).toBe('number'));
+  });
+
+  test('normalized amounts add up instead of concatenating', () => {
+    const parsed = {
+      expenses: [
+        { id: '1', title: 'A', date: '2025-01-01', amount: '800', category: 'Hrana' },
+        { id: '2', title: 'B', date: '2025-01-02', amount: '200', category: 'Hrana' },
+      ],
+    };
+    const total = withDefaults(parsed).expenses.reduce((s, e) => s + e.amount, 0);
+    expect(total).toBe(1000); // raw '+' on the strings would give '0800200'
+  });
+
+  test('turns an unusable amount into 0 rather than NaN', () => {
+    // NaN would spread into every total the row touches and render "NaN RSD".
+    const parsed = {
+      expenses: [
+        { id: '1', title: 'A', date: '2025-01-01', amount: 'abc', category: 'Hrana' },
+        { id: '2', title: 'B', date: '2025-01-02', amount: null, category: 'Hrana' },
+        { id: '3', title: 'C', date: '2025-01-03', amount: '', category: 'Hrana' },
+        { id: '4', title: 'D', date: '2025-01-04', amount: 500, category: 'Hrana' },
+      ],
+    };
+    const expenses = withDefaults(parsed).expenses;
+    expect(expenses.map((e) => e.amount)).toEqual([0, 0, 0, 500]);
+    expect(expenses.reduce((s, e) => s + e.amount, 0)).toBe(500);
+  });
+
+  // Repairing a present value is the job; fabricating an absent one is not.
+  // These objects come from JSON.parse, so a missing amount is an incomplete
+  // record, and adding 0 would reshape it and mask that.
+  test('leaves a record with no amount field untouched', () => {
+    const expense = { id: '1', title: 'A', date: '2025-01-01', category: 'Hrana' };
+    const template = { id: 'r1', title: 'Netflix', startDate: '2025-01-15' };
+    const result = withDefaults({ expenses: [expense], recurrings: [template] });
+    expect(result.expenses[0]).toBe(expense);
+    expect(result.recurrings[0]).toBe(template);
+    expect('amount' in result.expenses[0]).toBe(false);
+  });
+
+  test('repairs date and amount together in one pass', () => {
+    const parsed = {
+      expenses: [{ id: '1', title: 'A', date: '2026-02-31', amount: '800', category: 'Hrana' }],
+    };
+    expect(withDefaults(parsed).expenses[0]).toMatchObject({ date: '2026-02-28', amount: 800 });
+  });
+
+  // Generated expenses copy r.amount verbatim, so a string here would keep
+  // minting string-amount expenses on every startup.
+  test('coerces recurring template amounts', () => {
+    const parsed = {
+      recurrings: [{ id: 'r1', title: 'Netflix', amount: '800', startDate: '2025-01-15' }],
+    };
+    expect(withDefaults(parsed).recurrings[0].amount).toBe(800);
+  });
+
+  test('leaves a well-formed recurring template alone', () => {
+    const template = { id: 'r1', title: 'Netflix', amount: 800, startDate: '2025-01-15' };
+    expect(withDefaults({ recurrings: [template] }).recurrings[0]).toBe(template);
+  });
+
+  test('survives a null entry in either array', () => {
+    const parsed = { expenses: [null], recurrings: [null] };
+    expect(() => withDefaults(parsed)).not.toThrow();
+    expect(withDefaults(parsed).expenses).toEqual([null]);
+    expect(withDefaults(parsed).recurrings).toEqual([null]);
   });
 });
 

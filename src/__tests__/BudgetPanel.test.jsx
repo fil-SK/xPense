@@ -80,6 +80,28 @@ describe('BudgetPanel — fund rows', () => {
     expect(screen.getByText(/−10\.000/)).toBeInTheDocument();
   });
 
+  test('sums multiple expenses in the mapped category', () => {
+    const expenses = [
+      { id: '1', date: '2025-06-10', amount: 8000, category: CAT, title: 'x', note: '' },
+      { id: '2', date: '2025-06-11', amount: 2000, category: CAT, title: 'y', note: '' },
+    ];
+    renderPanel({ budget, trackingMaps, expenses });
+    expect(screen.getByText(/10\.000 \/ 50\.000/)).toBeInTheDocument();
+  });
+
+  // Spend goes through getTotalAmount, so a string amount adds rather than
+  // concatenating. withDefaults normalizes these on load, but the panel must
+  // not be the thing that depends on that having happened.
+  test('adds string amounts instead of concatenating them', () => {
+    const expenses = [
+      { id: '1', date: '2025-06-10', amount: '8000', category: CAT, title: 'x', note: '' },
+      { id: '2', date: '2025-06-11', amount: '2000', category: CAT, title: 'y', note: '' },
+    ];
+    renderPanel({ budget, trackingMaps, expenses });
+    expect(screen.getByText(/10\.000 \/ 50\.000/)).toBeInTheDocument();
+    expect(screen.getByText(/\+40\.000/)).toBeInTheDocument();
+  });
+
   test('renders "nije postavljeno" when budget amount is null', () => {
     const nullBudget = {
       [YEAR]: {

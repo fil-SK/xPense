@@ -28,15 +28,59 @@ export function emptyData() {
   };
 }
 
-// Repairs dates written before recurring generation clamped the day, where a
-// template starting on the 31st produced entries like '2026-02-31' that JS
-// reads as March 3. Untouched for well-formed dates, so this is a no-op for
-// every record saved since.
-function repairExpenseDates(expenses) {
+// Amounts must be numbers by the time they reach the app, because readers add
+// them up and `+` on a string concatenates instead: '800' + '200' is '800200',
+// not 1000. ExpenseModal already stores Math.round(Number(...)), but records
+// written earlier predate that, and both the backup file and the JSON export
+// are routinely hand-edited ("za Claude"), so the value arriving here can be
+// anything.
+//
+// Anything not finite becomes 0 rather than NaN. NaN poisons every total it is
+// added to and renders as "NaN RSD", so one bad row would make a whole month
+// unreadable; 0 keeps the damage local. Import rejects such rows outright
+// (sanitizeExpense), but by the time we get here the record is already stored,
+// so dropping it would silently lose data the user can still see and fix.
+// A field that isn't there is left alone rather than filled with 0. These
+// objects always come from JSON.parse, so an absent amount is a genuinely
+// incomplete record, and inventing a value would reshape it and hide that
+// instead of repairing anything. `null` counts as present-but-unusable.
+const needsAmountRepair = (value) =>
+  value !== undefined && !(typeof value === 'number' && Number.isFinite(value));
+
+const normalizeAmount = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+// Repairs stored expenses in a single pass:
+//  • dates written before recurring generation clamped the day, where a
+//    template starting on the 31st produced entries like '2026-02-31' that JS
+//    reads as March 3;
+//  • amounts that aren't numbers.
+// Returns the original object whenever nothing needed fixing, so this is a
+// no-op for healthy records.
+function repairExpenses(expenses) {
   if (!Array.isArray(expenses)) return [];
   return expenses.map((e) => {
-    const fixed = clampISODate(e?.date);
-    return fixed === e?.date ? e : { ...e, date: fixed };
+    if (!e || typeof e !== 'object') return e;
+    const date = clampISODate(e.date);
+    if (date === e.date && !needsAmountRepair(e.amount)) return e;
+    const repaired = { ...e, date };
+    if (needsAmountRepair(e.amount)) repaired.amount = normalizeAmount(e.amount);
+    return repaired;
+  });
+}
+
+// Recurring templates need the same treatment, and not only for their own
+// display: generateRecurringExpenses copies r.amount verbatim into the expenses
+// it mints, and those are dispatched straight into state without passing back
+// through withDefaults. A string amount on a template would otherwise keep
+// producing string-amount expenses on every startup.
+function repairRecurrings(recurrings) {
+  if (!Array.isArray(recurrings)) return [];
+  return recurrings.map((r) => {
+    if (!r || typeof r !== 'object' || !needsAmountRepair(r.amount)) return r;
+    return { ...r, amount: normalizeAmount(r.amount) };
   });
 }
 
@@ -51,11 +95,11 @@ export function withDefaults(parsed) {
   const base = emptyData();
   if (!parsed || typeof parsed !== 'object') return base;
   return {
-    expenses: repairExpenseDates(asArray(parsed.expenses, base.expenses)),
+    expenses: repairExpenses(asArray(parsed.expenses, base.expenses)),
     categories: asArray(parsed.categories, base.categories),
     budget: asObject(parsed.budget, base.budget),
     trackingMaps: asObject(parsed.trackingMaps, base.trackingMaps),
-    recurrings: asArray(parsed.recurrings, base.recurrings),
+    recurrings: repairRecurrings(asArray(parsed.recurrings, base.recurrings)),
     monthlyNotes: asObject(parsed.monthlyNotes, base.monthlyNotes),
     savingsGoals: asArray(parsed.savingsGoals, base.savingsGoals),
     categoryGroups: asArray(parsed.categoryGroups, base.categoryGroups),
@@ -150,13 +194,20 @@ function sanitizeExpense(raw, seenIds) {
 // Fills the shape out, then makes every expense safe to render. Returns the
 // cleaned data plus how many rows had to be dropped, so the UI can say so
 // instead of silently losing them.
+//
+// Note the rows are judged from `parsed`, not from `base`. Import and load
+// deliberately disagree about a broken amount: loading salvages it as 0, since
+// the record is already in the app and dropping it would lose data the user can
+// still see, whereas import rejects the row and says so, because the user still
+// has the file and can fix it. Reading `base.expenses` here would let
+// withDefaults' salvage run first and quietly turn every rejection into a 0.
 export function validateImportData(parsed) {
   const base = withDefaults(parsed);
   const seenIds = new Set();
   const expenses = [];
   let skipped = 0;
 
-  for (const raw of base.expenses) {
+  for (const raw of asArray(parsed?.expenses, [])) {
     const clean = sanitizeExpense(raw, seenIds);
     if (clean) expenses.push(clean);
     else skipped++;

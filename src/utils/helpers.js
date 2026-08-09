@@ -69,6 +69,11 @@ export function getExpensesForMonth(expenses, year, month) {
   return expenses.filter((e) => e.date?.startsWith(prefix));
 }
 
+// Every summation of expense amounts goes through here. `withDefaults` already
+// guarantees numeric amounts on anything loaded or imported, so the Number() is
+// a second line of defence rather than the primary one — but it is what makes
+// this safe to call on a hand-built array in a test, and `+` on a string
+// silently concatenates rather than failing loudly, so it stays.
 export function getTotalAmount(expenses) {
   return expenses.reduce((sum, e) => sum + Number(e.amount), 0);
 }
