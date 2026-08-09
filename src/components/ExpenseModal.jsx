@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, useId } from 'react';
 import { todayISO, categoryColor } from '../utils/helpers.js';
+import useFocusTrap from '../hooks/useFocusTrap.js';
 import { useApp } from '../App.jsx';
 
 function CategoryGroupPicker({ categories, groups, selected, onSelect, hasError }) {
@@ -36,7 +37,9 @@ function CategoryGroupPicker({ categories, groups, selected, onSelect, hasError 
     ...(ungrouped.length > 0 ? [{ id: '__ungrouped__', name: 'Opšte', cats: ungrouped }] : []),
   ];
 
-  function renderPills(cats) {
+  // A collapsed card is clipped to zero height, so its pills stay in the DOM but must
+  // drop out of the tab order — otherwise Tab lands on buttons nobody can see.
+  function renderPills(cats, reachable) {
     return (
       <div className="cgp-pills">
         {cats.map((c) => {
@@ -47,6 +50,8 @@ function CategoryGroupPicker({ categories, groups, selected, onSelect, hasError 
               key={c}
               type="button"
               className="cat-pill"
+              aria-pressed={active}
+              tabIndex={reachable ? undefined : -1}
               style={
                 active
                   ? { background: color, borderColor: color, color: '#fff' }
@@ -69,8 +74,13 @@ function CategoryGroupPicker({ categories, groups, selected, onSelect, hasError 
         const hasSelected = section.cats.includes(selected);
         return (
           <div key={section.id} className={`cgp-card ${isOpen ? 'cgp-card--open' : ''} ${hasSelected ? 'cgp-card--selected' : ''}`}>
-            <button type="button" className="cgp-card__header" onClick={() => toggleOpen(section.id)}>
-              <span className="cgp-card__arrow">{isOpen ? '▾' : '▸'}</span>
+            <button
+              type="button"
+              className="cgp-card__header"
+              aria-expanded={isOpen}
+              onClick={() => toggleOpen(section.id)}
+            >
+              <span className="cgp-card__arrow" aria-hidden="true">{isOpen ? '▾' : '▸'}</span>
               <span className="cgp-card__name">{section.name}</span>
               {hasSelected && !isOpen && (
                 <span className="cgp-card__sel-badge">{selected}</span>
@@ -79,7 +89,7 @@ function CategoryGroupPicker({ categories, groups, selected, onSelect, hasError 
             </button>
             <div className="cgp-card__body">
               <div className="cgp-card__inner">
-                {renderPills(section.cats)}
+                {renderPills(section.cats, isOpen)}
               </div>
             </div>
           </div>
@@ -93,6 +103,10 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
   const { data, addExpense, updateExpense, addRecurring } = useApp();
   const isEdit = !!expense;
 
+  const uid = useId();
+  const fieldId = (name) => `${uid}-${name}`;
+  const errorId = (name) => `${uid}-${name}-error`;
+
   // Only the first value survives, so this is the form as it was when the modal opened.
   const pristine = useRef(
     isEdit
@@ -104,6 +118,11 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
   const [errors, setErrors] = useState({});
   const [recurring, setRecurring] = useState(false);
   const [confirmingClose, setConfirmingClose] = useState(false);
+
+  // While the discard confirm is up it owns the trap; this one steps aside so the
+  // two don't fight over focus.
+  const dialogRef = useRef(null);
+  useFocusTrap(dialogRef, { active: !confirmingClose });
 
   const dirty = useMemo(
     () => recurring || Object.keys(form).some((k) => form[k] !== pristine.current[k]),
@@ -151,7 +170,8 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
     return errs;
   }
 
-  function handleSubmit() {
+  function handleSubmit(e) {
+    e?.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
     const payload = {
@@ -175,118 +195,132 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && requestClose()}>
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="expense-modal-title">
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby={fieldId('heading')} ref={dialogRef}>
         <div className="modal__header">
-          <span className="modal__title" id="expense-modal-title">{isEdit ? 'Izmeni trošak' : 'Novi trošak'}</span>
-          <button className="modal__close" onClick={requestClose} aria-label="Zatvori">✕</button>
+          <span className="modal__title" id={fieldId('heading')}>{isEdit ? 'Izmeni trošak' : 'Novi trošak'}</span>
+          <button type="button" className="modal__close" onClick={requestClose} aria-label="Zatvori">✕</button>
         </div>
 
-        <div className="modal__body">
-          <div className="form-group">
-            <label className="form-label">Naziv / opis</label>
-            <input
-              className={`form-input ${errors.title ? 'form-input--error' : ''}`}
-              value={form.title}
-              onChange={(e) => set('title', e.target.value)}
-              placeholder="npr. Ručak, Gorivo, Netflix..."
-              aria-invalid={!!errors.title}
-              autoFocus
-            />
-            {errors.title && <span className="form-error" role="alert">{errors.title}</span>}
-          </div>
-
-          <div className="form-row">
+        {/* noValidate: the fields carry constraints (type=date, min=0) but the messages
+            below each input are ours, so the browser must not preempt them. */}
+        <form className="modal__form" onSubmit={handleSubmit} noValidate>
+          <div className="modal__body">
             <div className="form-group">
-              <label className="form-label">Datum</label>
+              <label className="form-label" htmlFor={fieldId('title')}>Naziv / opis</label>
               <input
-                type="date"
-                className={`form-input ${errors.date ? 'form-input--error' : ''}`}
-                value={form.date}
-                onChange={(e) => set('date', e.target.value)}
-                aria-invalid={!!errors.date}
+                id={fieldId('title')}
+                className={`form-input ${errors.title ? 'form-input--error' : ''}`}
+                value={form.title}
+                onChange={(e) => set('title', e.target.value)}
+                placeholder="npr. Ručak, Gorivo, Netflix..."
+                aria-invalid={!!errors.title}
+                aria-describedby={errors.title ? errorId('title') : undefined}
+                autoFocus
               />
-              {errors.date && <span className="form-error" role="alert">{errors.date}</span>}
+              {errors.title && <span className="form-error" role="alert" id={errorId('title')}>{errors.title}</span>}
             </div>
-            <div className="form-group">
-              <label className="form-label">Iznos (RSD)</label>
-              <input
-                type="number"
-                min="0"
-                className={`form-input ${errors.amount ? 'form-input--error' : ''}`}
-                value={form.amount}
-                onChange={(e) => set('amount', e.target.value)}
-                placeholder="0"
-                aria-invalid={!!errors.amount}
-              />
-              {errors.amount && <span className="form-error" role="alert">{errors.amount}</span>}
-            </div>
-          </div>
 
-          <div className="form-group">
-            <label className="form-label">Kategorija</label>
-            {hasGroups ? (
-              <CategoryGroupPicker
-                categories={data.categories}
-                groups={data.categoryGroups}
-                selected={form.category}
-                onSelect={(c) => set('category', c)}
-                hasError={!!errors.category}
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label" htmlFor={fieldId('date')}>Datum</label>
+                <input
+                  id={fieldId('date')}
+                  type="date"
+                  className={`form-input ${errors.date ? 'form-input--error' : ''}`}
+                  value={form.date}
+                  onChange={(e) => set('date', e.target.value)}
+                  aria-invalid={!!errors.date}
+                  aria-describedby={errors.date ? errorId('date') : undefined}
+                />
+                {errors.date && <span className="form-error" role="alert" id={errorId('date')}>{errors.date}</span>}
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor={fieldId('amount')}>Iznos (RSD)</label>
+                <input
+                  id={fieldId('amount')}
+                  type="number"
+                  min="0"
+                  className={`form-input ${errors.amount ? 'form-input--error' : ''}`}
+                  value={form.amount}
+                  onChange={(e) => set('amount', e.target.value)}
+                  placeholder="0"
+                  aria-invalid={!!errors.amount}
+                  aria-describedby={errors.amount ? errorId('amount') : undefined}
+                />
+                {errors.amount && <span className="form-error" role="alert" id={errorId('amount')}>{errors.amount}</span>}
+              </div>
+            </div>
+
+            {/* The picker is a button grid, not a control, so the group carries the label. */}
+            <div className="form-group" role="group" aria-labelledby={fieldId('category')}>
+              <span className="form-label" id={fieldId('category')}>Kategorija</span>
+              {hasGroups ? (
+                <CategoryGroupPicker
+                  categories={data.categories}
+                  groups={data.categoryGroups}
+                  selected={form.category}
+                  onSelect={(c) => set('category', c)}
+                  hasError={!!errors.category}
+                />
+              ) : (
+                <div className={`cat-pills ${errors.category ? 'cat-pills--error' : ''}`}>
+                  {data.categories.map((c) => {
+                    const color = categoryColor(c, data.categories);
+                    const active = form.category === c;
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        className="cat-pill"
+                        aria-pressed={active}
+                        style={
+                          active
+                            ? { background: color, borderColor: color, color: '#fff' }
+                            : { background: color + '18', borderColor: color + '70', color }
+                        }
+                        onClick={() => set('category', c)}
+                      >
+                        {c}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {errors.category && <span className="form-error" role="alert">{errors.category}</span>}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor={fieldId('note')}>Napomena (opciono)</label>
+              <textarea
+                id={fieldId('note')}
+                className="form-textarea"
+                value={form.note}
+                onChange={(e) => set('note', e.target.value)}
+                placeholder="Dodatni detalji..."
               />
-            ) : (
-              <div className={`cat-pills ${errors.category ? 'cat-pills--error' : ''}`}>
-                {data.categories.map((c) => {
-                  const color = categoryColor(c, data.categories);
-                  const active = form.category === c;
-                  return (
-                    <button
-                      key={c}
-                      type="button"
-                      className="cat-pill"
-                      style={
-                        active
-                          ? { background: color, borderColor: color, color: '#fff' }
-                          : { background: color + '18', borderColor: color + '70', color }
-                      }
-                      onClick={() => set('category', c)}
-                    >
-                      {c}
-                    </button>
-                  );
-                })}
+            </div>
+
+            {!isEdit && (
+              <div className="form-recurring">
+                <button
+                  type="button"
+                  aria-label="Ponavljajući trošak"
+                  aria-pressed={recurring}
+                  className={`btn-recurring ${recurring ? 'btn-recurring--active' : ''}`}
+                  onClick={() => setRecurring((v) => !v)}
+                />
+                <span className="form-recurring__label">Ponavljajući trošak — automatski svakog meseca</span>
               </div>
             )}
-            {errors.category && <span className="form-error" role="alert">{errors.category}</span>}
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Napomena (opciono)</label>
-            <textarea
-              className="form-textarea"
-              value={form.note}
-              onChange={(e) => set('note', e.target.value)}
-              placeholder="Dodatni detalji..."
-            />
+          <div className="modal__footer">
+            <button type="button" className="btn btn--ghost" onClick={requestClose}>Otkaži</button>
+            <button type="submit" className="btn btn--primary" disabled={!form.category}>
+              {isEdit ? 'Sačuvaj izmene' : 'Dodaj trošak'}
+            </button>
           </div>
-
-          {!isEdit && (
-            <div className="form-recurring">
-              <button
-                type="button"
-                aria-label="Ponavljajući trošak"
-                className={`btn-recurring ${recurring ? 'btn-recurring--active' : ''}`}
-                onClick={() => setRecurring((v) => !v)}
-              />
-              <span className="form-recurring__label">Ponavljajući trošak — automatski svakog meseca</span>
-            </div>
-          )}
-        </div>
-
-        <div className="modal__footer">
-          <button className="btn btn--ghost" onClick={requestClose}>Otkaži</button>
-          <button className="btn btn--primary" onClick={handleSubmit} disabled={!form.category}>
-            {isEdit ? 'Sačuvaj izmene' : 'Dodaj trošak'}
-          </button>
-        </div>
+        </form>
       </div>
 
       {confirmingClose && <DiscardConfirm onKeepEditing={cancelClose} onDiscard={onClose} />}
@@ -298,12 +332,17 @@ function DiscardConfirm({ onKeepEditing, onDiscard }) {
   const keepRef = useRef(null);
   useEffect(() => { keepRef.current?.focus(); }, []);
 
+  // restoreFocus is off: cancelling returns focus to the field the user left, and
+  // discarding unmounts the form modal, which restores to whatever opened it.
+  const confirmRef = useRef(null);
+  useFocusTrap(confirmRef, { restoreFocus: false });
+
   return (
     <div
       className="modal-overlay modal-overlay--stacked"
       onClick={(e) => e.target === e.currentTarget && onKeepEditing()}
     >
-      <div className="modal modal--confirm" role="alertdialog" aria-modal="true" aria-labelledby="discard-title" aria-describedby="discard-text">
+      <div className="modal modal--confirm" role="alertdialog" aria-modal="true" aria-labelledby="discard-title" aria-describedby="discard-text" ref={confirmRef}>
         <div className="modal__header">
           <span className="modal__title" id="discard-title">Odbaci unos?</span>
         </div>

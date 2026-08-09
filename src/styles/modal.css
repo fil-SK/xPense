@@ -42,6 +42,10 @@
   padding: 2px 30px;
   overscroll-behavior: contain;
 }
+/* The <form> sits between .modal and .modal__body, so it has to pass the column
+   layout through: without flex/min-height the body stops scrolling and the modal
+   grows past the viewport. */
+.modal__form { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .modal__title { font-family: var(--font-display); font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
 .modal__close {
   width: 36px;

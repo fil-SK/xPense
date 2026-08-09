@@ -363,6 +363,150 @@ describe('ExpenseModal — discard confirmation', () => {
   });
 });
 
+// ─── Dialog semantics and keyboard ───────────────────────────────────────────
+
+describe('ExpenseModal — dialog semantics', () => {
+  test('is a labelled modal dialog', () => {
+    renderModal();
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAccessibleName('Novi trošak');
+  });
+
+  test('every input is reachable by its visible label', () => {
+    renderModal();
+    expect(screen.getByLabelText(/naziv \/ opis/i)).toBe(screen.getByPlaceholderText(/npr/i));
+    expect(screen.getByLabelText(/datum/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/iznos/i)).toBe(screen.getByRole('spinbutton'));
+    expect(screen.getByLabelText(/napomena/i)).toBeInTheDocument();
+  });
+
+  test('the category picker is a group labelled Kategorija', () => {
+    renderModal();
+    expect(screen.getByRole('group', { name: 'Kategorija' })).toBeInTheDocument();
+  });
+
+  test('an error message is announced and tied to its input', async () => {
+    const user = userEvent.setup();
+    renderModal();
+    await user.click(screen.getByRole('button', { name: 'Hrana' }));
+    await user.click(screen.getByRole('button', { name: /dodaj trošak/i }));
+    const title = screen.getByLabelText(/naziv \/ opis/i);
+    expect(title).toHaveAttribute('aria-invalid', 'true');
+    expect(title).toHaveAccessibleDescription(/naslov je obavezan/i);
+  });
+
+  test('opening the modal moves focus into it', () => {
+    renderModal();
+    expect(screen.getByLabelText(/naziv \/ opis/i)).toHaveFocus();
+  });
+
+  test('Tab wraps from the last control back to the first instead of leaving the dialog', async () => {
+    const user = userEvent.setup();
+    const { container } = renderModal();
+    const close = screen.getByRole('button', { name: /zatvori/i });
+    const cancel = screen.getByRole('button', { name: /otkaži/i });
+
+    // Submit is disabled without a category, so Otkaži is the last stop.
+    cancel.focus();
+    await user.tab();
+    expect(container.querySelector('.modal')).toContainElement(document.activeElement);
+    expect(close).toHaveFocus();
+
+    await user.tab({ shift: true });
+    expect(cancel).toHaveFocus();
+  });
+
+  test('pills inside a collapsed group card stay out of the tab order', async () => {
+    const user = userEvent.setup();
+    renderModal(undefined, GROUPED_CTX);
+    // Auto starts collapsed
+    expect(screen.getByRole('button', { name: 'Gorivo' })).toHaveAttribute('tabindex', '-1');
+    await user.click(screen.getByRole('button', { name: /auto/i }));
+    expect(screen.getByRole('button', { name: 'Gorivo' })).not.toHaveAttribute('tabindex');
+  });
+
+  test('closing returns focus to whatever opened the modal', () => {
+    const trigger = document.createElement('button');
+    document.body.appendChild(trigger);
+    trigger.focus();
+
+    const ctx = {
+      data: { expenses: [], categories: DEFAULT_CATEGORIES, budget: {}, trackingMaps: {}, recurrings: [] },
+      addExpense: vi.fn(), updateExpense: vi.fn(), addRecurring: vi.fn(), showToast: vi.fn(),
+    };
+    const { unmount } = render(
+      <AppContext.Provider value={ctx}>
+        <ExpenseModal onClose={vi.fn()} />
+      </AppContext.Provider>
+    );
+    expect(trigger).not.toHaveFocus();
+
+    unmount();
+    expect(trigger).toHaveFocus();
+    trigger.remove();
+  });
+});
+
+describe('ExpenseModal — submit on Enter', () => {
+  test('Enter in the title field saves the expense', async () => {
+    const user = userEvent.setup();
+    const { addExpense, onClose } = renderModal();
+    await user.click(screen.getByRole('button', { name: 'Hrana' }));
+    await user.type(screen.getByRole('spinbutton'), '350');
+    await user.type(screen.getByLabelText(/naziv \/ opis/i), 'Kafa{Enter}');
+    expect(addExpense).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Kafa', amount: 350, category: 'Hrana' })
+    );
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  test('Enter in the amount field saves the expense', async () => {
+    const user = userEvent.setup();
+    const { addExpense } = renderModal();
+    await user.click(screen.getByRole('button', { name: 'Hrana' }));
+    await user.type(screen.getByLabelText(/naziv \/ opis/i), 'Kafa');
+    await user.type(screen.getByRole('spinbutton'), '350{Enter}');
+    expect(addExpense).toHaveBeenCalled();
+  });
+
+  test('Enter with an empty form shows validation instead of saving', async () => {
+    const user = userEvent.setup();
+    const { addExpense } = renderModal();
+    await user.click(screen.getByRole('button', { name: 'Hrana' }));
+    await user.type(screen.getByLabelText(/naziv \/ opis/i), '{Enter}');
+    expect(addExpense).not.toHaveBeenCalled();
+    expect(screen.getByText(/naslov je obavezan/i)).toBeInTheDocument();
+  });
+
+  test('Enter in edit mode saves the changes', async () => {
+    const user = userEvent.setup();
+    const { updateExpense } = renderModal(existingExpense);
+    await user.type(screen.getByDisplayValue('Stari trošak'), ' dopuna{Enter}');
+    expect(updateExpense).toHaveBeenCalledWith('e1', expect.objectContaining({ title: 'Stari trošak dopuna' }));
+  });
+
+  test('Enter in the note textarea inserts a newline instead of saving', async () => {
+    const user = userEvent.setup();
+    const { addExpense } = renderModal();
+    await user.click(screen.getByRole('button', { name: 'Hrana' }));
+    await user.type(screen.getByLabelText(/naziv \/ opis/i), 'Kafa');
+    await user.type(screen.getByRole('spinbutton'), '350');
+    await user.type(screen.getByLabelText(/napomena/i), 'prva{Enter}druga');
+    expect(addExpense).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/napomena/i)).toHaveValue('prva\ndruga');
+  });
+
+  test('non-submit buttons do not submit the form', async () => {
+    const user = userEvent.setup();
+    const { addExpense, addRecurring } = renderModal();
+    await user.click(screen.getByRole('button', { name: 'Hrana' }));
+    await user.click(screen.getByRole('button', { name: /ponavljajući trošak/i }));
+    expect(addExpense).not.toHaveBeenCalled();
+    expect(addRecurring).not.toHaveBeenCalled();
+  });
+});
+
 // ─── Layout ──────────────────────────────────────────────────────────────────
 
 describe('ExpenseModal — scrollable body', () => {
