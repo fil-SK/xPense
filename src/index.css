@@ -210,34 +210,6 @@ body {
   flex-shrink: 0;
 }
 
-/* ── FAB (floating action button) ── */
-.fab {
-  position: fixed;
-  bottom: 28px;
-  right: 28px;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: var(--primary);
-  color: #fff;
-  font-size: 26px;
-  font-weight: 300;
-  line-height: 1;
-  border: none;
-  cursor: pointer;
-  box-shadow: 0 4px 16px rgba(99,102,241,.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 90;
-  transition: background .15s, box-shadow .15s, transform .15s;
-}
-.fab:hover {
-  background: var(--primary-dark);
-  box-shadow: 0 6px 20px rgba(99,102,241,.5);
-  transform: scale(1.07);
-}
-
 /* ── Buttons ── */
 .btn {
   display: inline-flex;
@@ -1456,6 +1428,9 @@ thead .bg__col--current { background: #e0e7ff !important; }
   padding-top: 6px;
 }
 .bg__tracking-pills { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; min-width: 0; }
+/* .tracking-pill carries no rules of its own — only this check mark, shown on
+   the pills of categories mapped to the fund. */
+.tracking-pill__check { font-size: 11px; }
 
 /* Add fund row */
 .bg__add-row > td { border-top: 1px dashed var(--border); }
@@ -1497,59 +1472,6 @@ thead .bg__col--current { background: #e0e7ff !important; }
 .bg__balance-cell--pos { color: var(--success); }
 .bg__balance-cell--neg { color: var(--danger); }
 .bg__balance-total { font-weight: 800; font-size: 14px; }
-
-/* ── Tracking setup view ─────────────────────────────────────────────────── */
-.tracking-setup {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  padding-bottom: 40px;
-}
-.tracking-setup__head { display: flex; flex-direction: column; gap: 4px; }
-.tracking-setup__title { font-size: 22px; font-weight: 700; }
-.tracking-setup__hint { font-size: 12px; color: var(--text-muted); }
-
-.tracking-setup__funds { display: flex; flex-direction: column; gap: 14px; }
-
-.tracking-fund-card {
-  background: var(--bg-card);
-  border-radius: var(--radius);
-  box-shadow: var(--sh-sm);
-  padding: 18px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.tracking-fund-card__name {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text);
-}
-.tracking-fund-card__count {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-top: -4px;
-}
-.tracking-fund-card__pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
-.tracking-pill__check { font-size: 11px; }
-
-.tracking-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 80px 20px;
-  text-align: center;
-  color: var(--text-muted);
-}
-.tracking-empty__icon { font-size: 40px; }
-.tracking-empty__title { font-size: 18px; font-weight: 600; color: var(--text); }
-.tracking-empty__sub { font-size: 14px; max-width: 360px; line-height: 1.6; }
 
 /* ── Budget panel in MonthView / Home ───────────────────────────────────── */
 .bp {
