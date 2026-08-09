@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef, createContext, useContext } from 'react';
-import { loadData, saveData } from './utils/storage.js';
-import { generateRecurringExpenses, applyBudgetCopy } from './utils/dataTransforms.js';
+import { loadData, saveData, hasStoredData, withDefaults } from './utils/storage.js';
+import {
+  generateRecurringExpenses, applyBudgetCopy, isEmptyData, applyExpenseDeletion,
+} from './utils/dataTransforms.js';
 import {
   getStoredHandle, checkPermission, grantPermission,
   readFromFile, writeToFile, pickFile,
@@ -30,48 +32,107 @@ export default function App() {
   const fileHandleRef = useRef(null);
   const [autosaveStatus, setAutosaveStatus] = useState('none');
 
-  useEffect(() => { saveData(data); }, [data]);
+  // Whether localStorage was empty when this session started has to be settled
+  // during the initial render — once the save effect below fires, localStorage
+  // always exists and the question can no longer be answered.
+  // 'recovering' blocks all writes until we know whether the backup file needs
+  // to be restored; 'ready' means localStorage and the file may be written.
+  const [bootState, setBootState] = useState(() => (hasStoredData() ? 'ready' : 'recovering'));
+  const recoveryPendingRef = useRef(bootState === 'recovering');
+
+  const dataRef = useRef(data);
+  useEffect(() => { dataRef.current = data; }, [data]);
+
+  const showToast = useCallback((msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 2800);
+  }, []);
 
   useEffect(() => {
-    if (!fileHandleRef.current || autosaveStatus !== 'active') return;
+    if (bootState !== 'ready') return;
+    saveData(data);
+  }, [data, bootState]);
+
+  useEffect(() => {
+    if (bootState !== 'ready' || !fileHandleRef.current || autosaveStatus !== 'active') return;
     writeToFile(fileHandleRef.current, data).catch(() => setAutosaveStatus('error'));
-  }, [data, autosaveStatus]);
+  }, [data, autosaveStatus, bootState]);
+
+  // Restores the backup file into state. Throws when the file can't be read or
+  // isn't a valid export — callers must leave autosave off in that case, or the
+  // write effect would overwrite the backup with empty data.
+  const recoverFromFile = useCallback(async (handle) => {
+    recoveryPendingRef.current = false;
+    const fileData = await readFromFile(handle);
+    if (!fileData || !Array.isArray(fileData.expenses)) {
+      throw new Error('invalid backup');
+    }
+    // Never replace work the user has already entered while we were reading.
+    if (!isEmptyData(dataRef.current)) return false;
+    setData(withDefaults(fileData));
+    return true;
+  }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function init() {
-      const handle = await getStoredHandle();
-      if (!handle) return;
-      const perm = await checkPermission(handle);
-      if (perm === 'granted') {
-        fileHandleRef.current = handle;
-        // Only load from file when localStorage was wiped (recovery mode).
-        // Normally localStorage is the source of truth; file is the backup.
-        const localStorageMissing = localStorage.getItem('expense-tracker-v1') === null;
-        if (localStorageMissing) {
-          try {
-            const fileData = await readFromFile(handle);
-            if (fileData && Array.isArray(fileData.expenses)) {
-              setData({
-                expenses: fileData.expenses ?? [],
-                categories: fileData.categories ?? [],
-                budget: fileData.budget ?? {},
-                trackingMaps: fileData.trackingMaps ?? {},
-                recurrings: fileData.recurrings ?? [],
-                monthlyNotes: fileData.monthlyNotes ?? {},
-                savingsGoals: fileData.savingsGoals ?? [],
-                categoryGroups: fileData.categoryGroups ?? [],
-              });
-            }
-          } catch { }
-        }
-        setAutosaveStatus('active');
-      } else {
-        fileHandleRef.current = handle;
+      let handle = null;
+      try {
+        handle = await getStoredHandle();
+      } catch {
+        handle = null;
+      }
+      if (cancelled) return;
+
+      if (!handle) {
+        recoveryPendingRef.current = false;
+        setBootState('ready');
+        return;
+      }
+      fileHandleRef.current = handle;
+
+      let perm = 'denied';
+      try {
+        perm = await checkPermission(handle);
+      } catch {
+        perm = 'denied';
+      }
+      if (cancelled) return;
+
+      // Without permission we can't read the file yet. Let the app save to
+      // localStorage normally; recovery is retried when the user grants access.
+      if (perm !== 'granted') {
         setAutosaveStatus('prompt');
+        setBootState('ready');
+        return;
+      }
+
+      // localStorage is the source of truth; the file is only read back when
+      // localStorage was wiped (recovery mode).
+      if (!recoveryPendingRef.current) {
+        setAutosaveStatus('active');
+        setBootState('ready');
+        return;
+      }
+
+      try {
+        const restored = await recoverFromFile(handle);
+        if (cancelled) return;
+        setAutosaveStatus('active');
+        setBootState('ready');
+        if (restored) showToast('Podaci vraćeni iz backup fajla.');
+      } catch {
+        if (cancelled) return;
+        setAutosaveStatus('error');
+        setBootState('ready');
+        showToast('Backup fajl se ne može pročitati — autosave je isključen.', 'danger');
       }
     }
+
     init();
-  }, []);
+    return () => { cancelled = true; };
+  }, [recoverFromFile, showToast]);
 
   useEffect(() => {
     if (darkMode) {
@@ -95,15 +156,13 @@ export default function App() {
     });
   }, [data.recurrings]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const showToast = useCallback((msg, type = 'success') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 2800);
-  }, []);
-
   const setupAutosave = useCallback(async () => {
     try {
       const handle = await pickFile();
       fileHandleRef.current = handle;
+      // The user chose the target explicitly — current state wins over whatever
+      // that file held, so there is nothing left to recover.
+      recoveryPendingRef.current = false;
       setAutosaveStatus('active');
       showToast('Autosave podešen — podaci će se automatski čuvati.');
     } catch (e) {
@@ -114,16 +173,28 @@ export default function App() {
   const activateAutosave = useCallback(async () => {
     try {
       const perm = await grantPermission(fileHandleRef.current);
-      if (perm === 'granted') {
-        setAutosaveStatus('active');
-        showToast('Autosave aktiviran.');
-      } else {
+      if (perm !== 'granted') {
         showToast('Dozvola odbijena.', 'danger');
+        return;
       }
+      // Permission arrived late — this is the first chance to recover.
+      if (recoveryPendingRef.current) {
+        try {
+          const restored = await recoverFromFile(fileHandleRef.current);
+          showToast(restored ? 'Podaci vraćeni iz backup fajla.' : 'Autosave aktiviran.');
+        } catch {
+          setAutosaveStatus('error');
+          showToast('Backup fajl se ne može pročitati — autosave je isključen.', 'danger');
+          return;
+        }
+      } else {
+        showToast('Autosave aktiviran.');
+      }
+      setAutosaveStatus('active');
     } catch {
       showToast('Greška pri aktivaciji autosave.', 'danger');
     }
-  }, [showToast]);
+  }, [showToast, recoverFromFile]);
 
   const navigateTo = useCallback((v, year, month) => {
     setPrevView(prevViewRef.current);
@@ -150,8 +221,12 @@ export default function App() {
   }, [showToast]);
 
   const deleteExpense = useCallback((id) => {
-    setData((d) => ({ ...d, expenses: d.expenses.filter((e) => e.id !== id) }));
-    showToast('Trošak obrisan.', 'danger');
+    const wasGenerated = !!dataRef.current.expenses.find((e) => e.id === id)?.recurringId;
+    setData((d) => applyExpenseDeletion(d, id));
+    showToast(
+      wasGenerated ? 'Trošak obrisan — neće biti ponovo kreiran.' : 'Trošak obrisan.',
+      'danger'
+    );
   }, [showToast]);
 
   const addCategory = useCallback((name) => {

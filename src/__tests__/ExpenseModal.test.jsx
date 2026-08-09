@@ -18,12 +18,12 @@ function renderModal(expense = undefined, ctxOverrides = {}) {
     showToast: vi.fn(),
     ...ctxOverrides,
   };
-  render(
+  const { container } = render(
     <AppContext.Provider value={ctx}>
       <ExpenseModal expense={expense} onClose={onClose} />
     </AppContext.Provider>
   );
-  return { addExpense, updateExpense, addRecurring, onClose };
+  return { addExpense, updateExpense, addRecurring, onClose, container };
 }
 
 // ─── Add mode ────────────────────────────────────────────────────────────────
@@ -241,5 +241,20 @@ describe('ExpenseModal — category group picker', () => {
     // In the default renderModal, data has no categoryGroups → flat pills rendered directly
     expect(screen.getByRole('button', { name: 'Hrana' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Transport' })).toBeInTheDocument();
+  });
+});
+
+// ─── Layout ──────────────────────────────────────────────────────────────────
+
+describe('ExpenseModal — scrollable body', () => {
+  test('form fields live in a scrollable body, header and footer stay outside it', () => {
+    const { container } = renderModal();
+    const body = container.querySelector('.modal__body');
+    expect(body).toBeTruthy();
+    // Scrollable region holds the form, not the title bar or action buttons
+    expect(body).toContainElement(screen.getByPlaceholderText(/npr/i));
+    expect(body).toContainElement(screen.getByRole('button', { name: /ponavljajući trošak/i }));
+    expect(body).not.toContainElement(screen.getByText('Novi trošak'));
+    expect(body).not.toContainElement(screen.getByRole('button', { name: /dodaj trošak/i }));
   });
 });

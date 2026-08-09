@@ -1,3 +1,5 @@
+import { clampISODate } from './helpers.js';
+
 const KEY = 'expense-tracker-v1';
 
 const DEFAULT_CATEGORIES = [
@@ -13,23 +15,66 @@ const DEFAULT_CATEGORIES = [
   'Ostalo',
 ];
 
+export function emptyData() {
+  return {
+    expenses: [],
+    categories: [...DEFAULT_CATEGORIES],
+    budget: {},
+    trackingMaps: {},
+    recurrings: [],
+    monthlyNotes: {},
+    savingsGoals: [],
+    categoryGroups: [],
+  };
+}
+
+// Repairs dates written before recurring generation clamped the day, where a
+// template starting on the 31st produced entries like '2026-02-31' that JS
+// reads as March 3. Untouched for well-formed dates, so this is a no-op for
+// every record saved since.
+function repairExpenseDates(expenses) {
+  if (!Array.isArray(expenses)) return [];
+  return expenses.map((e) => {
+    const fixed = clampISODate(e?.date);
+    return fixed === e?.date ? e : { ...e, date: fixed };
+  });
+}
+
+// Single place where a parsed data object is filled out to the full shape.
+// Every entry point (localStorage, JSON import, backup-file recovery) goes
+// through here, so a new top-level field only needs adding to emptyData().
+export function withDefaults(parsed) {
+  const base = emptyData();
+  if (!parsed || typeof parsed !== 'object') return base;
+  return {
+    expenses: repairExpenseDates(parsed.expenses ?? base.expenses),
+    categories: parsed.categories ?? base.categories,
+    budget: parsed.budget ?? base.budget,
+    trackingMaps: parsed.trackingMaps ?? base.trackingMaps,
+    recurrings: parsed.recurrings ?? base.recurrings,
+    monthlyNotes: parsed.monthlyNotes ?? base.monthlyNotes,
+    savingsGoals: parsed.savingsGoals ?? base.savingsGoals,
+    categoryGroups: parsed.categoryGroups ?? base.categoryGroups,
+  };
+}
+
+// Whether localStorage currently holds a saved record. Must be read before the
+// first saveData() call of a session, otherwise the answer is always "yes".
+export function hasStoredData() {
+  try {
+    return localStorage.getItem(KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export function loadData() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { expenses: [], categories: [...DEFAULT_CATEGORIES], budget: {}, trackingMaps: {}, recurrings: [], monthlyNotes: {}, savingsGoals: [], categoryGroups: [] };
-    const parsed = JSON.parse(raw);
-    return {
-      expenses: parsed.expenses ?? [],
-      categories: parsed.categories ?? [...DEFAULT_CATEGORIES],
-      budget: parsed.budget ?? {},
-      trackingMaps: parsed.trackingMaps ?? {},
-      recurrings: parsed.recurrings ?? [],
-      monthlyNotes: parsed.monthlyNotes ?? {},
-      savingsGoals: parsed.savingsGoals ?? [],
-      categoryGroups: parsed.categoryGroups ?? [],
-    };
+    if (!raw) return emptyData();
+    return withDefaults(JSON.parse(raw));
   } catch {
-    return { expenses: [], categories: [...DEFAULT_CATEGORIES], budget: {}, trackingMaps: {}, recurrings: [], monthlyNotes: {}, savingsGoals: [], categoryGroups: [] };
+    return emptyData();
   }
 }
 
@@ -58,16 +103,7 @@ export function importJSON(file) {
           reject(new Error('Neispravan format fajla.'));
           return;
         }
-        resolve({
-          expenses: parsed.expenses,
-          categories: parsed.categories,
-          budget: parsed.budget ?? {},
-          trackingMaps: parsed.trackingMaps ?? {},
-          recurrings: parsed.recurrings ?? [],
-          monthlyNotes: parsed.monthlyNotes ?? {},
-          savingsGoals: parsed.savingsGoals ?? [],
-          categoryGroups: parsed.categoryGroups ?? [],
-        });
+        resolve(withDefaults(parsed));
       } catch {
         reject(new Error('Neispravan JSON fajl.'));
       }

@@ -1,4 +1,39 @@
-import { generateRecurringExpenses, applyBudgetCopy } from '../utils/dataTransforms.js';
+import {
+  generateRecurringExpenses, applyBudgetCopy, isEmptyData, applyExpenseDeletion,
+} from '../utils/dataTransforms.js';
+
+// ─── isEmptyData ──────────────────────────────────────────────────────────────
+
+describe('isEmptyData', () => {
+  const blank = {
+    expenses: [], categories: ['Hrana'], budget: {}, trackingMaps: {},
+    recurrings: [], monthlyNotes: {}, savingsGoals: [], categoryGroups: [],
+  };
+
+  test('a freshly loaded default record counts as empty', () => {
+    expect(isEmptyData(blank)).toBe(true);
+  });
+
+  test('null or undefined counts as empty', () => {
+    expect(isEmptyData(null)).toBe(true);
+    expect(isEmptyData(undefined)).toBe(true);
+  });
+
+  test('default categories alone do not count as content', () => {
+    expect(isEmptyData({ ...blank, categories: ['Hrana', 'Transport', 'Zabava'] })).toBe(true);
+  });
+
+  test.each([
+    ['expenses', { expenses: [{ id: '1', amount: 1, date: '2025-01-01', title: 'X', category: 'Hrana' }] }],
+    ['budget', { budget: { 2025: { income: {}, funds: [] } } }],
+    ['recurrings', { recurrings: [{ id: 'r1' }] }],
+    ['savingsGoals', { savingsGoals: [{ id: 'g1' }] }],
+    ['monthlyNotes', { monthlyNotes: { 2025: { 0: 'beleska' } } }],
+    ['categoryGroups', { categoryGroups: [{ id: 'g', name: 'Režije', categories: [] }] }],
+  ])('%s makes it non-empty', (_label, patch) => {
+    expect(isEmptyData({ ...blank, ...patch })).toBe(false);
+  });
+});
 
 // ─── generateRecurringExpenses ────────────────────────────────────────────────
 
@@ -72,11 +107,145 @@ describe('generateRecurringExpenses', () => {
     expect(result.filter((e) => e.recurringId === 'r2')).toHaveLength(1); // Feb only
   });
 
+  test('clamps the day to months shorter than the start day', () => {
+    const t = { ...netflixTemplate, startDate: '2025-01-31' };
+    const now = new Date('2025-04-30');
+    const result = generateRecurringExpenses([t], [], now);
+    expect(result.map((e) => e.date)).toEqual([
+      '2025-01-31', '2025-02-28', '2025-03-31', '2025-04-30',
+    ]);
+  });
+
+  test('clamps to February 29 in a leap year', () => {
+    const t = { ...netflixTemplate, startDate: '2024-01-30' };
+    const now = new Date('2024-02-29');
+    const result = generateRecurringExpenses([t], [], now);
+    expect(result.map((e) => e.date)).toEqual(['2024-01-30', '2024-02-29']);
+  });
+
+  test('every generated date falls in the month it was generated for', () => {
+    const t = { ...netflixTemplate, startDate: '2025-01-31' };
+    const now = new Date('2025-12-31');
+    const result = generateRecurringExpenses([t], [], now);
+    expect(result).toHaveLength(12);
+    result.forEach((e, i) => {
+      const parsed = new Date(e.date + 'T00:00:00');
+      expect(parsed.getMonth()).toBe(i);
+      expect(parsed.getFullYear()).toBe(2025);
+    });
+  });
+
+  test('does not regenerate months listed in skippedMonths', () => {
+    const t = { ...netflixTemplate, skippedMonths: ['2025-02'] };
+    const now = new Date('2025-03-01');
+    const result = generateRecurringExpenses([t], [], now);
+    expect(result.map((e) => e.date)).toEqual(['2025-01-15', '2025-03-15']);
+  });
+
+  test('skips every listed month', () => {
+    const t = { ...netflixTemplate, skippedMonths: ['2025-01', '2025-03'] };
+    const now = new Date('2025-03-01');
+    const result = generateRecurringExpenses([t], [], now);
+    expect(result.map((e) => e.date)).toEqual(['2025-02-15']);
+  });
+
+  test('an empty or missing skippedMonths changes nothing', () => {
+    const now = new Date('2025-03-01');
+    expect(generateRecurringExpenses([{ ...netflixTemplate, skippedMonths: [] }], [], now)).toHaveLength(3);
+    expect(generateRecurringExpenses([netflixTemplate], [], now)).toHaveLength(3);
+  });
+
+  test('one template’s skips do not affect another', () => {
+    const spotify = { ...netflixTemplate, id: 'r2', title: 'Spotify', skippedMonths: ['2025-02'] };
+    const now = new Date('2025-03-01');
+    const result = generateRecurringExpenses([netflixTemplate, spotify], [], now);
+    expect(result.filter((e) => e.recurringId === 'r1')).toHaveLength(3);
+    expect(result.filter((e) => e.recurringId === 'r2')).toHaveLength(2);
+  });
+
   test('does not generate entries for future months beyond now', () => {
     const now = new Date('2025-01-31');
     const result = generateRecurringExpenses([netflixTemplate], [], now);
     expect(result).toHaveLength(1);
     expect(result[0].date).toBe('2025-01-15');
+  });
+});
+
+// ─── applyExpenseDeletion ─────────────────────────────────────────────────────
+
+describe('applyExpenseDeletion', () => {
+  const manual = { id: 'm1', title: 'Ručak', date: '2025-02-10', amount: 900, category: 'Hrana' };
+  const generated = { id: 'g1', recurringId: 'r1', title: 'Netflix', date: '2025-02-15', amount: 800, category: 'Zabava' };
+
+  function makeData(extra = {}) {
+    return {
+      expenses: [manual, generated],
+      categories: ['Hrana', 'Zabava'],
+      recurrings: [netflixTemplate],
+      ...extra,
+    };
+  }
+
+  test('removes the expense', () => {
+    const result = applyExpenseDeletion(makeData(), 'm1');
+    expect(result.expenses.map((e) => e.id)).toEqual(['g1']);
+  });
+
+  test('leaves recurrings untouched for a manually added expense', () => {
+    const result = applyExpenseDeletion(makeData(), 'm1');
+    expect(result.recurrings[0].skippedMonths).toBeUndefined();
+  });
+
+  test('records the month on the template for a generated expense', () => {
+    const result = applyExpenseDeletion(makeData(), 'g1');
+    expect(result.expenses.map((e) => e.id)).toEqual(['m1']);
+    expect(result.recurrings[0].skippedMonths).toEqual(['2025-02']);
+  });
+
+  test('appends without duplicating an already skipped month', () => {
+    const data = makeData({ recurrings: [{ ...netflixTemplate, skippedMonths: ['2025-02'] }] });
+    const result = applyExpenseDeletion(data, 'g1');
+    expect(result.recurrings[0].skippedMonths).toEqual(['2025-02']);
+  });
+
+  test('keeps months skipped earlier', () => {
+    const data = makeData({ recurrings: [{ ...netflixTemplate, skippedMonths: ['2025-01'] }] });
+    const result = applyExpenseDeletion(data, 'g1');
+    expect(result.recurrings[0].skippedMonths).toEqual(['2025-01', '2025-02']);
+  });
+
+  test('only touches the template that generated the expense', () => {
+    const spotify = { ...netflixTemplate, id: 'r2' };
+    const data = makeData({ recurrings: [netflixTemplate, spotify] });
+    const result = applyExpenseDeletion(data, 'g1');
+    expect(result.recurrings[0].skippedMonths).toEqual(['2025-02']);
+    expect(result.recurrings[1].skippedMonths).toBeUndefined();
+  });
+
+  test('is a no-op for an unknown id', () => {
+    const result = applyExpenseDeletion(makeData(), 'nope');
+    expect(result.expenses).toHaveLength(2);
+    expect(result.recurrings[0].skippedMonths).toBeUndefined();
+  });
+
+  test('survives a missing recurrings array', () => {
+    const data = { expenses: [generated], categories: [] };
+    expect(applyExpenseDeletion(data, 'g1').recurrings).toEqual([]);
+  });
+
+  // The regression this whole mechanism exists for.
+  test('a deleted generated expense is not recreated by the next generation pass', () => {
+    const now = new Date('2025-03-01');
+    const existing = generateRecurringExpenses([netflixTemplate], [], now)
+      .map((e, i) => ({ ...e, id: `gen${i}` }));
+    expect(existing.map((e) => e.date)).toEqual(['2025-01-15', '2025-02-15', '2025-03-15']);
+
+    const data = { expenses: existing, categories: [], recurrings: [netflixTemplate] };
+    const afterDelete = applyExpenseDeletion(data, 'gen1'); // drop February
+
+    const regenerated = generateRecurringExpenses(afterDelete.recurrings, afterDelete.expenses, now);
+    expect(regenerated).toEqual([]);
+    expect(afterDelete.expenses.map((e) => e.date)).toEqual(['2025-01-15', '2025-03-15']);
   });
 });
 

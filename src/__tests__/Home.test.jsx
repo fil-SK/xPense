@@ -58,14 +58,25 @@ describe('Home — removed Prethodne action card', () => {
     renderHome();
     expect(screen.queryByText(/pogledaj prethodne/i)).not.toBeInTheDocument();
   });
+});
 
-  test('still renders current month action card', () => {
+describe('Home — redesigned overview + sections', () => {
+  test('renders the overview card with monthly total', () => {
     renderHome();
-    expect(screen.getByText(/potrošnja ovog meseca/i)).toBeInTheDocument();
+    expect(screen.getByText(/potrošeno ovaj mesec/i)).toBeInTheDocument();
   });
 
-  test('still renders budget action card', () => {
+  test('renders Poslednje transakcije section', () => {
     renderHome();
-    expect(screen.getByText(/budžet/i)).toBeInTheDocument();
+    expect(screen.getByText(/poslednje transakcije/i)).toBeInTheDocument();
+  });
+
+  test('renders Grafikoni i uvidi toggle and reveals charts on click', async () => {
+    const user = userEvent.setup();
+    renderHome();
+    expect(screen.getByText(/grafikoni i uvidi/i)).toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: /prikaži/i });
+    await user.click(toggle);
+    expect(screen.getByRole('button', { name: /sakrij/i })).toBeInTheDocument();
   });
 });

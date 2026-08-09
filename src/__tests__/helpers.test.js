@@ -1,7 +1,113 @@
 import {
   formatAmount, formatDate, todayISO,
   getExpensesForMonth, getTotalAmount, getByCategory, getAvailableMonths,
+  lastDayOfMonth, isoDate, clampISODate, categoryColor, CHART_COLORS,
 } from '../utils/helpers.js';
+
+describe('categoryColor', () => {
+  const categories = ['Hrana', 'Transport', 'Zabava'];
+
+  test('assigns colors by position in the category list', () => {
+    expect(categoryColor('Hrana', categories)).toBe(CHART_COLORS[0]);
+    expect(categoryColor('Transport', categories)).toBe(CHART_COLORS[1]);
+    expect(categoryColor('Zabava', categories)).toBe(CHART_COLORS[2]);
+  });
+
+  test('a category keeps its color when the list grows', () => {
+    const before = categoryColor('Transport', categories);
+    expect(categoryColor('Transport', [...categories, 'Sport', 'Zdravlje'])).toBe(before);
+  });
+
+  test('wraps around when there are more categories than colors', () => {
+    const many = Array.from({ length: CHART_COLORS.length + 2 }, (_, i) => `Kat${i}`);
+    expect(categoryColor(`Kat${CHART_COLORS.length}`, many)).toBe(CHART_COLORS[0]);
+  });
+
+  // The bug this function exists to prevent: the pie chart used to color slices
+  // by their sorted position, so a category was one color in the chart and a
+  // different one in the list beside it.
+  test('does not depend on the order the category is encountered', () => {
+    const sortedBySpend = ['Zabava', 'Hrana', 'Transport'];
+    sortedBySpend.forEach((name) => {
+      expect(categoryColor(name, categories)).toBe(CHART_COLORS[categories.indexOf(name)]);
+    });
+  });
+
+  test('unknown categories get a stable color instead of always the first', () => {
+    const archived = categoryColor('Arhivirana', categories);
+    expect(archived).toBe(categoryColor('Arhivirana', categories));
+    expect(CHART_COLORS).toContain(archived);
+  });
+
+  test('different unknown categories can differ from each other', () => {
+    const names = ['Alfa', 'Beta', 'Gama', 'Delta', 'Epsilon'];
+    const colors = new Set(names.map((n) => categoryColor(n, categories)));
+    expect(colors.size).toBeGreaterThan(1);
+  });
+
+  test('tolerates a missing category list and empty names', () => {
+    expect(CHART_COLORS).toContain(categoryColor('Hrana'));
+    expect(CHART_COLORS).toContain(categoryColor(undefined, categories));
+    expect(CHART_COLORS).toContain(categoryColor('', categories));
+  });
+});
+
+describe('lastDayOfMonth', () => {
+  test.each([
+    [2025, 0, 31],  // Januar
+    [2025, 1, 28],  // Februar, non-leap
+    [2024, 1, 29],  // Februar, leap
+    [2000, 1, 29],  // Februar, century leap
+    [1900, 1, 28],  // Februar, century non-leap
+    [2025, 3, 30],  // April
+    [2025, 11, 31], // Decembar
+  ])('%i-%i has %i days', (year, month, expected) => {
+    expect(lastDayOfMonth(year, month)).toBe(expected);
+  });
+});
+
+describe('isoDate', () => {
+  test('formats a valid day unchanged', () => {
+    expect(isoDate(2025, 0, 15)).toBe('2025-01-15');
+  });
+
+  test('pads single-digit month and day', () => {
+    expect(isoDate(2025, 8, 5)).toBe('2025-09-05');
+  });
+
+  test('clamps day 31 to the end of a short month', () => {
+    expect(isoDate(2025, 1, 31)).toBe('2025-02-28');
+    expect(isoDate(2024, 1, 31)).toBe('2024-02-29');
+    expect(isoDate(2025, 3, 31)).toBe('2025-04-30');
+  });
+
+  test('produces a string that parses back to the same month', () => {
+    const str = isoDate(2026, 1, 31);
+    const parsed = new Date(str + 'T00:00:00');
+    expect(parsed.getMonth()).toBe(1);
+    expect(parsed.getFullYear()).toBe(2026);
+  });
+});
+
+describe('clampISODate', () => {
+  test('repairs an out-of-range day', () => {
+    expect(clampISODate('2026-02-31')).toBe('2026-02-28');
+    expect(clampISODate('2025-04-31')).toBe('2025-04-30');
+  });
+
+  test('leaves a valid date untouched', () => {
+    expect(clampISODate('2025-01-15')).toBe('2025-01-15');
+    expect(clampISODate('2024-02-29')).toBe('2024-02-29');
+  });
+
+  test('passes through anything that is not a YYYY-MM-DD string', () => {
+    expect(clampISODate('')).toBe('');
+    expect(clampISODate(undefined)).toBe(undefined);
+    expect(clampISODate(null)).toBe(null);
+    expect(clampISODate('15.01.2025')).toBe('15.01.2025');
+    expect(clampISODate('2025-13-01')).toBe('2025-13-01');
+  });
+});
 
 describe('formatAmount', () => {
   test('appends RSD and rounds', () => {

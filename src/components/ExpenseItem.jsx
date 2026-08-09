@@ -1,12 +1,7 @@
 import { useState } from 'react';
-import { formatAmount, formatDate, CHART_COLORS } from '../utils/helpers.js';
+import { formatAmount, formatDate, categoryColor } from '../utils/helpers.js';
 import { useApp } from '../App.jsx';
 import ExpenseModal from './ExpenseModal.jsx';
-
-function categoryColor(category, categories) {
-  const idx = categories.indexOf(category);
-  return CHART_COLORS[idx >= 0 ? idx % CHART_COLORS.length : 0];
-}
 
 export default function ExpenseItem({ expense }) {
   const { data, deleteExpense } = useApp();
@@ -28,7 +23,9 @@ export default function ExpenseItem({ expense }) {
   return (
     <>
       <div className="expense-item" onClick={() => setEditing(true)}>
-        <span className="expense-item__cat-dot" style={{ background: color }} />
+        <span className="expense-item__icon" style={{ background: color + '22' }}>
+          <span className="expense-item__cat-dot" style={{ background: color }} />
+        </span>
         <div className="expense-item__body">
           <div className="expense-item__title">{expense.title}</div>
           <div className="expense-item__meta">

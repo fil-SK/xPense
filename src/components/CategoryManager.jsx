@@ -90,7 +90,7 @@ export default function CategoryManager() {
   }
 
   return (
-    <div className="categories-page">
+    <div className="categories-page view">
       <div className="cat-header">
         <button className="month-header__back" onClick={() => navigateTo('home')}>←</button>
         <h1 className="cat-header__title">Upravljanje kategorijama</h1>
@@ -137,7 +137,7 @@ export default function CategoryManager() {
                 ) : (
                   <>
                     <span className="cat-item__name">{cat}</span>
-                    <span style={{ fontSize: 12, color: '#94a3b8', marginRight: 8 }}>
+                    <span style={{ fontSize: 12, color: 'var(--text3)', marginRight: 8 }}>
                       {usageCount(cat)} stavki
                     </span>
                     <div className="cat-item__actions">
@@ -184,7 +184,7 @@ export default function CategoryManager() {
             </div>
           </div>
 
-          <div style={{ color: '#64748b', fontSize: 13, padding: '4px 2px' }}>
+          <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '4px 2px' }}>
             <b>Arhiviraj</b> — uklanja kategoriju iz liste, stare stavke ostaju nepromenjene.{' '}
             <b>Obriši</b> — briše kategoriju i premešta sve stare stavke na "Ostalo".
           </div>
@@ -236,7 +236,7 @@ export default function CategoryManager() {
                 <div className="cat-group-item__body">
                   <div className="cat-group-item__inner">
                     {data.categories.length === 0 && (
-                      <span style={{ color: '#94a3b8', fontSize: 13 }}>Nema kategorija.</span>
+                      <span style={{ color: 'var(--text3)', fontSize: 13 }}>Nema kategorija.</span>
                     )}
                     {data.categories.map((cat) => {
                       const inThis = group.categories.includes(cat);
@@ -274,7 +274,7 @@ export default function CategoryManager() {
             </div>
           </div>
 
-          <div style={{ color: '#64748b', fontSize: 13, padding: '4px 2px' }}>
+          <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '4px 2px' }}>
             Grupe organizuju kategorije u tematske celine koje se prikazuju pri dodavanju troška.
             Svaka kategorija može biti u samo jednoj grupi — čekiranje je automatski premešta.
           </div>

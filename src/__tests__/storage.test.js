@@ -1,6 +1,68 @@
-import { loadData, saveData, importJSON, importBudget, buildCSVString } from '../utils/storage.js';
+import {
+  loadData, saveData, importJSON, importBudget, buildCSVString,
+  hasStoredData, withDefaults,
+} from '../utils/storage.js';
 
 const KEY = 'expense-tracker-v1';
+
+describe('hasStoredData', () => {
+  test('is false when localStorage holds no record', () => {
+    expect(hasStoredData()).toBe(false);
+  });
+
+  test('is true once data has been saved', () => {
+    saveData(loadData());
+    expect(hasStoredData()).toBe(true);
+  });
+
+  test('loadData alone does not create a record', () => {
+    loadData();
+    expect(hasStoredData()).toBe(false);
+  });
+});
+
+describe('withDefaults', () => {
+  test('fills every top-level field for an empty object', () => {
+    const filled = withDefaults({});
+    expect(filled.expenses).toEqual([]);
+    expect(filled.budget).toEqual({});
+    expect(filled.trackingMaps).toEqual({});
+    expect(filled.recurrings).toEqual([]);
+    expect(filled.monthlyNotes).toEqual({});
+    expect(filled.savingsGoals).toEqual([]);
+    expect(filled.categoryGroups).toEqual([]);
+    expect(filled.categories.length).toBeGreaterThan(0);
+  });
+
+  test('keeps provided values', () => {
+    const expenses = [{ id: '1', title: 'X', date: '2025-01-01', amount: 5, category: 'Hrana' }];
+    expect(withDefaults({ expenses, categories: ['Hrana'] })).toMatchObject({
+      expenses,
+      categories: ['Hrana'],
+    });
+  });
+
+  test('returns defaults for null or non-object input', () => {
+    expect(withDefaults(null).expenses).toEqual([]);
+    expect(withDefaults('nope').expenses).toEqual([]);
+  });
+
+  test('repairs out-of-range expense dates written by the old generator', () => {
+    const parsed = {
+      expenses: [
+        { id: '1', title: 'Netflix', date: '2026-02-31', amount: 800, category: 'Zabava' },
+        { id: '2', title: 'Kirija', date: '2025-04-31', amount: 40000, category: 'Stanovanje' },
+      ],
+    };
+    expect(withDefaults(parsed).expenses.map((e) => e.date)).toEqual(['2026-02-28', '2025-04-30']);
+  });
+
+  test('leaves well-formed expense dates alone', () => {
+    const expense = { id: '1', title: 'Ručak', date: '2025-01-15', amount: 900, category: 'Hrana' };
+    const [result] = withDefaults({ expenses: [expense] }).expenses;
+    expect(result).toBe(expense); // same object — no needless copy
+  });
+});
 
 describe('loadData', () => {
   test('returns defaults when localStorage is empty', () => {

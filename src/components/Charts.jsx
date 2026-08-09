@@ -4,25 +4,48 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as BTooltip, Legend,
 } from 'recharts';
 import {
-  getByCategory, formatAmount, CHART_COLORS,
+  getByCategory, formatAmount, categoryColor,
   getExpensesForMonth, getTotalAmount, MONTHS_SR_SHORT,
 } from '../utils/helpers.js';
 import { useApp } from '../App.jsx';
 
+// Recharts draws into SVG attributes, which can't read CSS variables, so the
+// theme has to be handed to it explicitly. These mirror the `:root` and
+// `html.dark` blocks in index.css — keep them in step if those change.
+export const CHART_THEME = {
+  light: {
+    grid: '#e2e8f0',                    // --border
+    tick: '#64748b',                    // --text-muted
+    bar: '#6366f1',                     // --primary
+    barMuted: '#a5b4fc',
+    cursor: 'rgba(15, 23, 42, .05)',
+  },
+  dark: {
+    grid: '#2b352e',
+    tick: '#95a29b',
+    bar: '#2bd47c',
+    barMuted: 'rgba(43, 212, 124, .42)',
+    cursor: 'rgba(255, 255, 255, .06)',
+  },
+};
+
 function CustomTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13 }}>
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: 'var(--text)' }}>
       <div style={{ fontWeight: 700 }}>{payload[0].name}</div>
-      <div style={{ color: '#6366f1' }}>{formatAmount(payload[0].value)}</div>
+      <div style={{ color: 'var(--primary)' }}>{formatAmount(payload[0].value)}</div>
     </div>
   );
 }
 
 function PieSection({ expenses }) {
+  const { data } = useApp();
   const byCategory = getByCategory(expenses);
+  // Slices are ordered by value, but colored by category so they match the
+  // dots and badges in the expense list below.
   const chartData = Object.entries(byCategory)
-    .map(([name, value]) => ({ name, value }))
+    .map(([name, value]) => ({ name, value, color: categoryColor(name, data.categories) }))
     .sort((a, b) => b.value - a.value);
 
   if (!chartData.length) {
@@ -44,19 +67,19 @@ function PieSection({ expenses }) {
             paddingAngle={2}
             dataKey="value"
           >
-            {chartData.map((_, i) => (
-              <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+            {chartData.map((entry) => (
+              <Cell key={entry.name} fill={entry.color} />
             ))}
           </Pie>
           <RTooltip content={<CustomTooltip />} />
         </PieChart>
       </ResponsiveContainer>
       <div className="legend-list">
-        {chartData.map((entry, i) => (
+        {chartData.map((entry) => (
           <div key={entry.name} className="legend-item">
-            <span className="legend-dot" style={{ background: CHART_COLORS[i % CHART_COLORS.length] }} />
+            <span className="legend-dot" style={{ background: entry.color }} />
             <span>{entry.name}</span>
-            <span style={{ fontWeight: 600, color: '#0f172a' }}>
+            <span style={{ fontWeight: 600, color: 'var(--text)' }}>
               {((entry.value / total) * 100).toFixed(0)}%
             </span>
           </div>
@@ -67,7 +90,8 @@ function PieSection({ expenses }) {
 }
 
 function CompareSection({ currentYear, currentMonth }) {
-  const { data } = useApp();
+  const { data, darkMode } = useApp();
+  const theme = darkMode ? CHART_THEME.dark : CHART_THEME.light;
   const [selected, setSelected] = useState([]);
 
   const availableMonths = useMemo(() => {
@@ -130,13 +154,18 @@ function CompareSection({ currentYear, currentMonth }) {
       {chartData.length > 1 && (
         <ResponsiveContainer width="100%" height={240}>
           <BarChart data={chartData} margin={{ top: 4, right: 12, left: 8, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-            <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-            <YAxis tickFormatter={(v) => (v / 1000).toFixed(0) + 'k'} tick={{ fontSize: 12 }} width={44} />
-            <BTooltip formatter={(v) => formatAmount(v)} />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme.grid} />
+            <XAxis dataKey="month" tick={{ fontSize: 12, fill: theme.tick }} stroke={theme.grid} />
+            <YAxis
+              tickFormatter={(v) => (v / 1000).toFixed(0) + 'k'}
+              tick={{ fontSize: 12, fill: theme.tick }}
+              stroke={theme.grid}
+              width={44}
+            />
+            <BTooltip formatter={(v) => formatAmount(v)} cursor={{ fill: theme.cursor }} />
             <Bar dataKey="total" name="Ukupno (RSD)" radius={[6, 6, 0, 0]}>
-              {chartData.map((entry, i) => (
-                <Cell key={i} fill={entry.isCurrent ? '#6366f1' : '#a5b4fc'} />
+              {chartData.map((entry) => (
+                <Cell key={entry.month} fill={entry.isCurrent ? theme.bar : theme.barMuted} />
               ))}
             </Bar>
           </BarChart>

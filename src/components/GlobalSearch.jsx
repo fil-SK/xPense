@@ -1,11 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../App.jsx';
-import { formatAmount, formatDate, CHART_COLORS, MONTHS_SR } from '../utils/helpers.js';
-
-function categoryColor(category, categories) {
-  const idx = categories.indexOf(category);
-  return CHART_COLORS[idx >= 0 ? idx % CHART_COLORS.length : 0];
-}
+import { formatAmount, formatDate, categoryColor, MONTHS_SR } from '../utils/helpers.js';
 
 export default function GlobalSearch() {
   const { data, navigateTo } = useApp();
@@ -36,7 +31,7 @@ export default function GlobalSearch() {
   const hasQuery = query.trim().length > 0;
 
   return (
-    <div className="gsearch">
+    <div className="gsearch view">
       <div className="gsearch__header">
         <button className="month-header__back" onClick={() => navigateTo('home')} title="Nazad">←</button>
         <h1 className="gsearch__title">Pretraga troškova</h1>
@@ -65,7 +60,9 @@ export default function GlobalSearch() {
             const color = categoryColor(e.category, data.categories);
             return (
               <div key={e.id} className="expense-item" onClick={() => goToMonth(e)} style={{ cursor: 'pointer' }}>
-                <span className="expense-item__cat-dot" style={{ background: color }} />
+                <span className="expense-item__icon" style={{ background: color + '22' }}>
+                  <span className="expense-item__cat-dot" style={{ background: color }} />
+                </span>
                 <div className="expense-item__body">
                   <div className="expense-item__title">{e.title}</div>
                   <div className="expense-item__meta">

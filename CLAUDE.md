@@ -24,13 +24,15 @@ Test files live in `src/__tests__/`. Setup file is `src/test/setup.js` (clears l
 
 **Test workflow:** For every new feature or edit, write tests in the relevant file(s) before reporting done, then run `npm test` to confirm nothing is broken. If a new pure utility is added, test it in the helpers or dataTransforms suite. If a new component is added, add a `.test.jsx` file for it.
 
-**Current test files (169 tests, 13 files):**
-- `helpers.test.js` — all pure functions in `utils/helpers.js`
-- `storage.test.js` — `loadData`, `saveData`, `importJSON`, `importBudget`, `buildCSVString`
-- `dataTransforms.test.js` — `generateRecurringExpenses`, `applyBudgetCopy`
+**Current test files (237 tests, 15 files):**
+- `helpers.test.js` — all pure functions in `utils/helpers.js`, incl. `lastDayOfMonth` / `isoDate` / `clampISODate` day-clamping and `categoryColor` stability
+- `storage.test.js` — `loadData`, `saveData`, `importJSON`, `importBudget`, `buildCSVString`, `hasStoredData`, `withDefaults` (incl. expense-date repair)
+- `dataTransforms.test.js` — `generateRecurringExpenses` (incl. `skippedMonths` and day clamping), `applyBudgetCopy`, `isEmptyData`, `applyExpenseDeletion` (incl. the delete→regenerate round trip)
+- `App.boot.test.jsx` — startup recovery from the backup file (fileStorage mocked): restore when localStorage is empty, skip when it isn't, never write the file on a failed or invalid read, wait for permission
 - `GlobalSearch.test.jsx` — rendering, search filtering, navigation callbacks
-- `ExpenseModal.test.jsx` — add/edit/recurring flows, validation; submit disabled until category selected; group card picker (auto-expand, pill select, flat-pill fallback)
-- `MonthView.test.jsx` — back navigation via prevView, monthly note textarea
+- `ExpenseModal.test.jsx` — add/edit/recurring flows, validation; submit disabled until category selected; group card picker (auto-expand, pill select, flat-pill fallback); scrollable `.modal__body` contains the form but not header/footer
+- `MonthView.test.jsx` — back navigation via prevView, monthly note textarea, Analiza toggle uses `.btn--toggled` with no inline colors
+- `Charts.test.jsx` — `CHART_THEME` light/dark key parity and color-format sanity (no rendering; recharts needs a layout engine)
 - `SavingsGoals.test.jsx` — empty state, add form, progress calculation, two-click delete
 - `Header.test.jsx` — Praćenje absent, Prethodne button render/active states, theme toggle
 - `Home.test.jsx` — quick-add circle button, modal open/close, removed Prethodne card
@@ -62,7 +64,7 @@ The full data object shape:
     }
   },
   trackingMaps: { [year]: { [fundId]: [categoryName] } },
-  recurrings: [{ id, title, amount, category, note, startDate, frequency }],
+  recurrings: [{ id, title, amount, category, note, startDate, frequency, skippedMonths?: ['YYYY-MM'] }],
   monthlyNotes: { [year]: { [month]: string } },
   savingsGoals: [{ id, name, target, fundId, year }]
 }
@@ -70,18 +72,29 @@ The full data object shape:
 
 `null` in a budget amount array means "not set" (renders as `—`); `0` means explicitly zero.
 `recurringId` on an expense links it back to its `recurrings` template (auto-generated expenses only).
+`skippedMonths` is optional and holds `'YYYY-MM'` strings for months the user deleted by hand — see the recurring section below.
 `monthlyNotes` keys use numeric year and numeric month (0-indexed). `savingsGoals.fundId` and `savingsGoals.year` are nullable (unlinked goal shows 0 progress).
 
 ### Persistence
 
 Two layers, both managed in `App.jsx`:
-- **localStorage** (`expense-tracker-v1`) — always written on every `data` state change via `useEffect`
+- **localStorage** (`expense-tracker-v1`) — written on every `data` state change via `useEffect`, once `bootState === 'ready'`
 - **File autosave** (`storage/xpense-data.json`) — written on every `data` change when active; uses the File System Access API with the handle stored in IndexedDB (`xpense-fs` DB). On startup, the file is only read when localStorage is missing (recovery mode). Theme preference is stored separately under `expense-tracker-theme` and is never included in data exports.
+
+**Boot sequence (`bootState` + `recoveryPendingRef`).** "Was localStorage empty at startup?" must be answered during the *initial render* via `hasStoredData()` — the save effect writes a record almost immediately, after which the question is unanswerable. That answer seeds `bootState` (`'recovering'` | `'ready'`) and `recoveryPendingRef`. While `bootState === 'recovering'` **both** persistence effects are blocked, so nothing can overwrite localStorage or the backup file before recovery resolves.
+
+Recovery rules, all of which exist to protect the backup file:
+- `recoverFromFile` throws when the file is unreadable or isn't a valid export. On that path autosave is set to `'error'` and **never** `'active'` — an active autosave would immediately write empty data over the backup.
+- Recovery refuses to replace state that is no longer empty (`isEmptyData` in `dataTransforms.js`), so it can't discard work entered while the read was in flight.
+- If permission isn't granted at startup, `recoveryPendingRef` stays true and `activateAutosave` retries the recovery after the user grants access.
+- `setupAutosave` (user picks a new file) clears `recoveryPendingRef` — current state intentionally wins over that file's contents.
+
+`App.boot.test.jsx` covers these paths with `src/utils/fileStorage.js` mocked; three of its cases fail against the pre-fix boot order.
 
 `src/utils/storage.js` handles localStorage read/write, JSON import/export, and CSV export (`buildCSVString` + `exportCSV`). The BOM prefix in `exportCSV` ensures Excel opens the file with correct UTF-8 encoding.
 `src/utils/fileStorage.js` handles IndexedDB handle storage and File System Access API read/write.
 
-When adding new top-level fields to the data shape, backfill them in four places: the empty-localStorage return in `loadData()`, the parsed-JSON return in `loadData()`, the error-catch return in `loadData()`, and the file-recovery `setData` call in `App.jsx`. Also update `importJSON` to pass the field through. See `categoryGroups` as the reference example.
+When adding a new top-level field to the data shape, add it to **`emptyData()` and `withDefaults()` in `storage.js` only**. Every entry point — `loadData()` (all three returns), `importJSON`, and the file-recovery path in `App.jsx` — routes through those two functions. Consider whether `isEmptyData()` in `dataTransforms.js` should treat the field as content.
 
 ### Navigation and prevView
 
@@ -108,8 +121,8 @@ When adding new top-level fields to the data shape, backfill them in four places
 - **`BudgetPanel.jsx`** — renders inside `MonthView` above the expense list; shows live fund vs. actual spend as compact single-column rows (`bp-row`): dot indicator | fund name | progress bar | spent/allocated | remaining. Returns null if no funds have tracking categories mapped.
 - **`BudgetView.jsx`** — year is local state (‹/› nav buttons); `currentMonth` highlight only applies for the actual current year. "📋 Kopiraj u {year+1}" copies fund structure + plata income + tracking category links to the next year (double-click confirmation if target already has data). `copyBudgetToYear` in App.jsx assigns new fund IDs and remaps `trackingMaps`. Each fund row has a **📂 chip** (shows mapped-category count) that expands an inline tracking panel directly below the row; only one panel can be open at a time; panel hides during drag. The chip and panel are rendered inside `SortableFundRow` as a React Fragment — the `setNodeRef` (DnD target) attaches to the first `<tr>`, the panel is a second sibling `<tr>`. Flex containers inside `<td>` require explicit `width: 100%` and `flex: 1; min-width: 0` on inner flex children to wrap correctly in table layout.
 - **`CategoryManager.jsx`** — two-tab interface: **Kategorije** (flat list with archive/delete/rename/add, same as before) and **Grupe** (group management). In the Kategorije tab, the 🗑️ button expands into two choices: **Arhiviraj** (removes name from `data.categories` only, expenses unchanged) and **Obriši** (removes and reassigns all matching expenses to "Ostalo"), wired to `archiveCategory` and `deleteCategory`. In the Grupe tab, each group row has a header (click to expand) that reveals checkboxes for all categories — checked = in this group. Checking a category auto-removes it from any other group it was in. `data-testid="group-{id}"` is on each group row for test scoping with `within()`. Group actions: `addCategoryGroup`, `renameCategoryGroup`, `deleteCategoryGroup`, `updateCategoryGroupMembers`. All category mutation actions (`deleteCategory`, `archiveCategory`, `updateCategory`) sync `categoryGroups` automatically.
-- **`ExpenseModal.jsx`** — form starts with `category: ''`; the submit button is `disabled={!form.category}` so the user must pick a category before saving. Category picker renders as expandable group cards (`CategoryGroupPicker` inline component) when `data.categoryGroups` is non-empty: cards expand/collapse independently, the group containing the current category is auto-expanded on open, selecting a pill keeps the card open. Falls back to flat pills when no groups are configured. The recurring 🔁 toggle button uses `aria-label="Ponavljajući trošak"` (queryable in tests).
-- **`Charts.jsx`** — rendered above the expense list when toggled; pie chart for category breakdown, bar chart for month comparison.
+- **`ExpenseModal.jsx`** — form starts with `category: ''`; the submit button is `disabled={!form.category}` so the user must pick a category before saving. Category picker renders as expandable group cards (`CategoryGroupPicker` inline component) when `data.categoryGroups` is non-empty: cards expand/collapse independently, the group containing the current category is auto-expanded on open, selecting a pill keeps the card open. Falls back to flat pills when no groups are configured. The recurring 🔁 toggle button uses `aria-label="Ponavljajući trošak"` (queryable in tests). The dialog is a flex column capped at `calc(100dvh - 32px)`: header and footer are fixed (`flex-shrink: 0`), all form fields sit in a scrolling `.modal__body` (`flex: 1; min-height: 0; overflow-y: auto`) that uses negative side margins matching the modal padding so the scrollbar sits at the modal edge — if the modal padding changes, update those margins in both media queries too.
+- **`Charts.jsx`** — rendered above the expense list when toggled; pie chart for category breakdown, bar chart for month comparison. Pie slices are *ordered* by value but *colored* by category via `categoryColor`, so they match the dots and badges in the list below. Recharts paints into SVG attributes, which cannot read CSS variables — the grid, axis ticks, bars and hover cursor therefore come from the exported `CHART_THEME` table, picked with `darkMode` from context. `CHART_THEME.light` mirrors `:root` and `.dark` mirrors `html.dark`; update both together when those blocks change. The default recharts tooltip is themed from CSS instead (`html.dark .recharts-default-tooltip`).
 - **`GlobalSearch.jsx`** — searches across all expenses (title, category, note), sorted by date desc; clicking a result navigates to that month's MonthView.
 - **`SavingsGoals.jsx`** — savings goal list with progress bars; progress = sum of all non-null amounts in the linked budget fund for the linked year. Goal year select defaults to the most recent budget year that exists. Delete requires two clicks.
 - **`MonthView.jsx`** — includes a monthly-note textarea between the stats row and BudgetPanel; saves on blur only when text has changed.
@@ -119,13 +132,27 @@ When adding new top-level fields to the data shape, backfill them in four places
 
 `ExpenseModal` (add mode only) has a 🔁 toggle button (`aria-label="Ponavljajući trošak"`) with a muted label below it. When active, submit calls `addRecurring` instead of `addExpense` — the template is stored in `data.recurrings`. A `useEffect` in `App.jsx` (dependency: `data.recurrings`) auto-generates expense entries via `setData` functional update for every month from `startDate` up to the current month, skipping any month where a matching `recurringId` entry already exists. Recurring expenses show a 🔄 badge in `ExpenseItem`.
 
+**Dates are clamped, never rolled over.** A template starting on the 29th–31st must not emit `'2026-02-31'` — JS parses that as March 3, so the expense lands in the wrong month and the intended month looks empty. `generateRecurringExpenses` builds dates with `isoDate(year, month, day)` from `helpers.js`, which clamps the day to `lastDayOfMonth`. Records written before this fix are repaired on load by `repairExpenseDates` inside `withDefaults` (`storage.js`), using `clampISODate`; it returns the original object when the date is already valid, so it is a no-op for healthy data. Use `isoDate` for any new date construction rather than string concatenation.
+
+**Deletion must be remembered.** That effect re-runs on every startup — `loadData()` returns a fresh `recurrings` array, so its identity always changes — which means a generated expense the user deleted would be recreated on the next reload. `deleteExpense` therefore routes through `applyExpenseDeletion` (`dataTransforms.js`), which appends the expense's `'YYYY-MM'` to the parent template's `skippedMonths`; `generateRecurringExpenses` skips those months. Deleting a generated expense shows a distinct toast ("neće biti ponovo kreiran") because the exclusion is permanent — there is currently no UI to un-skip a month, only re-adding the expense manually.
+
+Known edge: editing a generated expense's date into a different month leaves the original month empty, so it gets regenerated on the next pass. Moving generated expenses across months is not really supported. This and the missing "un-skip a month" affordance are both written up in `BACKLOG.md`.
+
 ### Pure utilities extracted for testability
 
-`src/utils/dataTransforms.js` contains `generateRecurringExpenses` and `applyBudgetCopy`, extracted from App.jsx closures so they can be unit-tested without rendering. App.jsx imports and calls them; behavior is identical.
+`src/utils/dataTransforms.js` contains `generateRecurringExpenses`, `applyBudgetCopy`, `applyExpenseDeletion`, and `isEmptyData`, extracted from App.jsx closures so they can be unit-tested without rendering. App.jsx imports and calls them; behavior is identical.
 
 ### Styling
 
 All styles are in `src/index.css` — one flat file, BEM-ish class names per component (`.budget__*`, `.bg__*`, `.cat-*`, `.bp-*`, `.gsearch__*`, `.goal-*`, etc.). Dark mode uses `html.dark` class toggled on `document.documentElement`; CSS variables are overridden in the `html.dark {}` block at the bottom of the file. Always use `var(--text)`, `var(--bg-card)`, etc. on new inputs/elements so they respect the theme automatically.
+
+**Never hardcode a hex color in a component.** The dark palette is green-primary (`--primary: #2bd47c`) while light is indigo (`#6366f1`), so a literal like `#6366f1` is not merely off-shade in dark mode — it's the wrong hue entirely. Use `var(--…)` in inline styles, or a class. Toggle buttons use `.btn--toggled` (generic) or `.section-head__toggle--active`; both resolve to `var(--soft)` / `var(--primary)`. The only legitimate literals left in components are `CHART_THEME` in `Charts.jsx` (SVG can't read CSS vars) and `color: '#fff'` on pills whose background is a saturated `CHART_COLORS` value.
+
+### Category colors
+
+`categoryColor(category, categories)` in `utils/helpers.js` is the single source of truth — every dot, pill, badge, chart slice and legend entry goes through it. Never index `CHART_COLORS` directly in a component: the pie chart used to color slices by their sorted position, which made the same category one color in the chart and another in the list beside it.
+
+Color is chosen by the category's position in `data.categories`, so a category keeps its color as the list grows. Names not in the list (archived, or arriving from an import) fall back to a hash of the name, so they stay distinct and stable rather than all collapsing onto the first color.
 
 ### Serbian language and locale
 

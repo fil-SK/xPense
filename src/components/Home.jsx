@@ -4,16 +4,21 @@ import { getExpensesForMonth, getTotalAmount, formatAmount, getMonthName, todayI
 import { exportJSON, exportCSV, importJSON } from '../utils/storage.js';
 import SavingsGoals from './SavingsGoals.jsx';
 import ExpenseModal from './ExpenseModal.jsx';
+import ExpenseItem from './ExpenseItem.jsx';
+import BudgetPanel from './BudgetPanel.jsx';
+import Charts from './Charts.jsx';
 
 export default function Home() {
   const { data, navigateTo, importData, showToast, deleteRecurring } = useApp();
   const [adding, setAdding] = useState(false);
+  const [showCharts, setShowCharts] = useState(false);
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
 
   const thisMonth = getExpensesForMonth(data.expenses, year, month);
   const total = getTotalAmount(thisMonth);
+  const recent = [...thisMonth].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
 
   const lastMonthDate = new Date(year, month - 1, 1);
   const lastMonth = getExpensesForMonth(data.expenses, lastMonthDate.getFullYear(), lastMonthDate.getMonth());
@@ -30,64 +35,88 @@ export default function Home() {
   }
 
   return (
-    <div className="home">
+    <div className="home view">
       <div className="home__hero">
-        <div className="home__hero__row">
-          <div className="home__greeting">
-            Zdravo! 👋 <span>Kontroliši</span> svoje troškove.
+        <div>
+          <div className="home__greeting">Zdravo 👋</div>
+          <div className="home__sub">
+            {getMonthName(month)} {year} — pratite, analizirajte, štedite.
           </div>
-          <button className="home__add-btn" onClick={() => setAdding(true)} title="Dodaj trošak" aria-label="Dodaj trošak">
-            +
-          </button>
         </div>
-        <div className="home__sub">
-          {getMonthName(month)} {year} — pratite, analizirajte, štedite.
-        </div>
+        <button className="home__add-btn" onClick={() => setAdding(true)} aria-label="Dodaj trošak">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+          + Novi trošak
+        </button>
       </div>
 
-      <div className="home__summary">
-        <div className="stat-card">
-          <div className="stat-card__label">Ovaj mesec</div>
-          <div className="stat-card__value stat-card__value--primary">{formatAmount(total)}</div>
+      <div className="overview-card">
+        <div className="overview-card__main">
+          <div className="overview-card__label">Potrošeno ovaj mesec</div>
+          <div className="overview-card__value-row">
+            <div className="overview-card__value">{total.toLocaleString('sr-RS')}</div>
+            <div className="overview-card__unit">RSD</div>
+          </div>
           {delta !== null && (
-            <div className={`stat-card__delta ${delta > 0 ? 'stat-card__delta--up' : 'stat-card__delta--down'}`}>
-              {delta > 0 ? '▲' : '▼'} {Math.abs(delta).toFixed(0)}% vs prošli mesec
+            <div className={`overview-card__badge ${delta > 0 ? 'overview-card__badge--warn' : ''}`}>
+              {delta > 0 ? '▲' : '▼'} {Math.abs(delta).toFixed(0)}% {delta > 0 ? 'više' : 'manje'} nego prošlog meseca
             </div>
           )}
         </div>
-        <div className="stat-card">
-          <div className="stat-card__label">Transakcija</div>
-          <div className="stat-card__value">{thisMonth.length}</div>
-          <div className="stat-card__delta">u {getMonthName(month)}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-card__label">Prosek po stavci</div>
-          <div className="stat-card__value">
-            {thisMonth.length > 0 ? formatAmount(total / thisMonth.length) : '—'}
+        <div className="overview-card__side">
+          <div className="overview-card__row">
+            <span className="overview-card__row-label">Transakcija</span>
+            <span className="overview-card__row-value">{thisMonth.length}</span>
           </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-card__label">Prošli mesec</div>
-          <div className="stat-card__value">{lastTotal > 0 ? formatAmount(lastTotal) : '—'}</div>
-          <div className="stat-card__delta">{getMonthName(lastMonthDate.getMonth())}</div>
+          <div className="overview-card__row">
+            <span className="overview-card__row-label">Prosek po stavci</span>
+            <span className="overview-card__row-value">
+              {thisMonth.length > 0 ? formatAmount(total / thisMonth.length) : '—'}
+            </span>
+          </div>
+          <div className="overview-card__row">
+            <span className="overview-card__row-label">Prošli mesec</span>
+            <span className="overview-card__row-value">
+              {lastTotal > 0 ? formatAmount(lastTotal) : '—'}
+            </span>
+          </div>
         </div>
       </div>
 
-      <div className="home__actions">
-        <div className="action-card" onClick={() => navigateTo('current')}>
-          <div className="action-card__icon">📅</div>
-          <div className="action-card__title">Potrošnja ovog meseca</div>
-          <div className="action-card__desc">
-            Pregledaj i unesi troškove za {getMonthName(month)} {year}.
-          </div>
+      <BudgetPanel year={year} month={month} />
+
+      <div className="section-block">
+        <div className="section-head">
+          <div className="section-head__title">Poslednje transakcije</div>
+          <button className="section-head__link" onClick={() => navigateTo('current')}>Vidi sve →</button>
         </div>
-        <div className="action-card" onClick={() => navigateTo('budget')}>
-          <div className="action-card__icon">💰</div>
-          <div className="action-card__title">Budžet {year}</div>
-          <div className="action-card__desc">
-            Plata, bonusi i fondovi — prati prihode i planirane rashode po mesecima.
+        {recent.length > 0 ? (
+          <div className="recent-list">
+            {recent.map((e) => <ExpenseItem key={e.id} expense={e} />)}
           </div>
+        ) : (
+          <div className="expense-list">
+            <div className="expense-list__empty">
+              <div className="expense-list__empty-icon">💸</div>
+              Nema troškova za ovaj mesec. Dodaj prvi!
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="section-block">
+        <div className="section-head">
+          <div>
+            <div className="section-head__title">Grafikoni i uvidi</div>
+            <div className="section-head__sub">Detaljna analiza potrošnje — prikaži kad ti zatreba.</div>
+          </div>
+          <button
+            className={`section-head__toggle ${showCharts ? 'section-head__toggle--active' : ''}`}
+            onClick={() => setShowCharts((v) => !v)}
+          >
+            📊 {showCharts ? 'Sakrij' : 'Prikaži'}
+          </button>
         </div>
+        {showCharts && <Charts expenses={thisMonth} year={year} month={month} />}
       </div>
 
       <div className="home__tools">
@@ -104,7 +133,7 @@ export default function Home() {
       </div>
 
       {data.recurrings?.length > 0 && (
-        <div className="home__recurring">
+        <div className="home__recurring section-block">
           <div className="home__section-title">Ponavljajući troškovi</div>
           <div className="recurring-list">
             {data.recurrings.map((r) => (

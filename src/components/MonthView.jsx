@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../App.jsx';
 import {
   getExpensesForMonth, getTotalAmount, formatAmount,
-  getMonthName, getByCategory, CHART_COLORS, todayISO,
+  getMonthName, getByCategory, categoryColor, todayISO,
 } from '../utils/helpers.js';
 import ExpenseItem from './ExpenseItem.jsx';
 import ExpenseModal from './ExpenseModal.jsx';
@@ -79,7 +79,7 @@ export default function MonthView({ year, month, isCurrent }) {
   const avg = allExpenses.length > 0 ? total / allExpenses.length : 0;
 
   return (
-    <div className="month-view">
+    <div className="month-view view">
       <div className="month-header">
         <button
           className="month-header__back"
@@ -121,7 +121,7 @@ export default function MonthView({ year, month, isCurrent }) {
                     style={{
                       display: 'inline-block',
                       width: 10, height: 10, borderRadius: '50%', marginRight: 6,
-                      background: CHART_COLORS[data.categories.indexOf(topCategory[0]) % CHART_COLORS.length],
+                      background: categoryColor(topCategory[0], data.categories),
                     }}
                   />
                   {topCategory[0]}
@@ -168,8 +168,7 @@ export default function MonthView({ year, month, isCurrent }) {
           + Dodaj trošak
         </button>
         <button
-          className={`btn btn--ghost btn--sm ${showCharts ? 'btn--primary' : ''}`}
-          style={showCharts ? { background: '#e0e7ff', color: '#6366f1', borderColor: '#c7d2fe' } : {}}
+          className={`btn btn--ghost btn--sm ${showCharts ? 'btn--toggled' : ''}`}
           onClick={() => setShowCharts((v) => !v)}
         >
           📊 Analiza

@@ -46,6 +46,25 @@ describe('MonthView — back navigation', () => {
   });
 });
 
+describe('MonthView — Analiza toggle', () => {
+  test('is not marked active before it is clicked', () => {
+    renderMonthView();
+    const btn = screen.getByRole('button', { name: /analiza/i });
+    expect(btn).not.toHaveClass('btn--toggled');
+  });
+
+  // The active state must come from a themed class, never inline colors —
+  // hardcoded hex values here used to stay indigo in dark mode.
+  test('marks itself active with a class and no inline colors', async () => {
+    const user = userEvent.setup();
+    renderMonthView();
+    const btn = screen.getByRole('button', { name: /analiza/i });
+    await user.click(btn);
+    expect(btn).toHaveClass('btn--toggled');
+    expect(btn.getAttribute('style')).toBeFalsy();
+  });
+});
+
 describe('MonthView — monthly note', () => {
   test('renders note textarea with placeholder', () => {
     renderMonthView();

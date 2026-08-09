@@ -1,19 +1,38 @@
 // Pure business logic functions — no React, no side effects.
 
+import { isoDate } from './helpers.js';
+
+// "Nothing worth keeping yet." Used to decide whether restoring from the backup
+// file is safe — categories alone are defaults, so they don't count as content.
+export function isEmptyData(data) {
+  if (!data) return true;
+  return (
+    (data.expenses?.length ?? 0) === 0 &&
+    (data.recurrings?.length ?? 0) === 0 &&
+    (data.savingsGoals?.length ?? 0) === 0 &&
+    Object.keys(data.budget ?? {}).length === 0 &&
+    Object.keys(data.monthlyNotes ?? {}).length === 0 &&
+    (data.categoryGroups?.length ?? 0) === 0
+  );
+}
+
 export function generateRecurringExpenses(recurrings, existingExpenses, now = new Date()) {
   const curYear = now.getFullYear();
   const curMonth = now.getMonth();
   const newExpenses = [];
   for (const r of recurrings) {
+    // Months the user deleted by hand — regenerating them would undo that.
+    const skipped = new Set(r.skippedMonths ?? []);
     const start = new Date(r.startDate + 'T00:00:00');
     const sy = start.getFullYear();
     const sm = start.getMonth();
-    const day = String(start.getDate()).padStart(2, '0');
+    const day = start.getDate();
     for (let y = sy; y <= curYear; y++) {
       const mFrom = y === sy ? sm : 0;
       const mTo = y === curYear ? curMonth : 11;
       for (let m = mFrom; m <= mTo; m++) {
         const monthStr = `${y}-${String(m + 1).padStart(2, '0')}`;
+        if (skipped.has(monthStr)) continue;
         const exists = existingExpenses.some(
           (e) => e.recurringId === r.id && e.date.startsWith(monthStr)
         );
@@ -24,13 +43,36 @@ export function generateRecurringExpenses(recurrings, existingExpenses, now = ne
             amount: r.amount,
             category: r.category,
             note: r.note || '',
-            date: `${monthStr}-${day}`,
+            // Clamped: a template starting on the 31st lands on the 28th/30th
+            // in shorter months rather than spilling into the next one.
+            date: isoDate(y, m, day),
           });
         }
       }
     }
   }
   return newExpenses;
+}
+
+// Deletes one expense. When it was auto-generated from a recurring template,
+// the month is recorded on that template so the generator won't recreate it on
+// the next startup.
+export function applyExpenseDeletion(data, id) {
+  const target = data.expenses.find((e) => e.id === id);
+  const expenses = data.expenses.filter((e) => e.id !== id);
+  if (!target?.recurringId) return { ...data, expenses };
+
+  const month = target.date.slice(0, 7);
+  return {
+    ...data,
+    expenses,
+    recurrings: (data.recurrings ?? []).map((r) => {
+      if (r.id !== target.recurringId) return r;
+      const skipped = r.skippedMonths ?? [];
+      if (skipped.includes(month)) return r;
+      return { ...r, skippedMonths: [...skipped, month] };
+    }),
+  };
 }
 
 export function applyBudgetCopy(data, fromYear, toYear) {

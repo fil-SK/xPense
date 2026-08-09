@@ -1,13 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { todayISO, CHART_COLORS } from '../utils/helpers.js';
+import { todayISO, categoryColor } from '../utils/helpers.js';
 import { useApp } from '../App.jsx';
 
 function CategoryGroupPicker({ categories, groups, selected, onSelect, hasError }) {
-  const colorIndex = useMemo(
-    () => Object.fromEntries(categories.map((c, i) => [c, i])),
-    [categories]
-  );
-
   const selectedGroupId = useMemo(
     () => groups.find((g) => g.categories.includes(selected))?.id ?? '__ungrouped__',
     [groups, selected]
@@ -45,7 +40,7 @@ function CategoryGroupPicker({ categories, groups, selected, onSelect, hasError 
     return (
       <div className="cgp-pills">
         {cats.map((c) => {
-          const color = CHART_COLORS[(colorIndex[c] ?? 0) % CHART_COLORS.length];
+          const color = categoryColor(c, categories);
           const active = selected === c;
           return (
             <button
@@ -157,102 +152,102 @@ export default function ExpenseModal({ expense, defaultDate, onClose }) {
           <button className="modal__close" onClick={onClose}>✕</button>
         </div>
 
-        <div className="form-group">
-          <label className="form-label">Naziv / opis</label>
-          <input
-            className={`form-input ${errors.title ? 'form-input--error' : ''}`}
-            value={form.title}
-            onChange={(e) => set('title', e.target.value)}
-            placeholder="npr. Ručak, Gorivo, Netflix..."
-            autoFocus
-          />
-          {errors.title && <span className="form-error">{errors.title}</span>}
-        </div>
-
-        <div className="form-row">
+        <div className="modal__body">
           <div className="form-group">
-            <label className="form-label">Datum</label>
+            <label className="form-label">Naziv / opis</label>
             <input
-              type="date"
-              className={`form-input ${errors.date ? 'form-input--error' : ''}`}
-              value={form.date}
-              onChange={(e) => set('date', e.target.value)}
+              className={`form-input ${errors.title ? 'form-input--error' : ''}`}
+              value={form.title}
+              onChange={(e) => set('title', e.target.value)}
+              placeholder="npr. Ručak, Gorivo, Netflix..."
+              autoFocus
             />
-            {errors.date && <span className="form-error">{errors.date}</span>}
+            {errors.title && <span className="form-error">{errors.title}</span>}
           </div>
-          <div className="form-group">
-            <label className="form-label">Iznos (RSD)</label>
-            <input
-              type="number"
-              min="0"
-              className={`form-input ${errors.amount ? 'form-input--error' : ''}`}
-              value={form.amount}
-              onChange={(e) => set('amount', e.target.value)}
-              placeholder="0"
-            />
-            {errors.amount && <span className="form-error">{errors.amount}</span>}
-          </div>
-        </div>
 
-        <div className="form-group">
-          <label className="form-label">Kategorija</label>
-          {hasGroups ? (
-            <CategoryGroupPicker
-              categories={data.categories}
-              groups={data.categoryGroups}
-              selected={form.category}
-              onSelect={(c) => set('category', c)}
-              hasError={!!errors.category}
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Datum</label>
+              <input
+                type="date"
+                className={`form-input ${errors.date ? 'form-input--error' : ''}`}
+                value={form.date}
+                onChange={(e) => set('date', e.target.value)}
+              />
+              {errors.date && <span className="form-error">{errors.date}</span>}
+            </div>
+            <div className="form-group">
+              <label className="form-label">Iznos (RSD)</label>
+              <input
+                type="number"
+                min="0"
+                className={`form-input ${errors.amount ? 'form-input--error' : ''}`}
+                value={form.amount}
+                onChange={(e) => set('amount', e.target.value)}
+                placeholder="0"
+              />
+              {errors.amount && <span className="form-error">{errors.amount}</span>}
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Kategorija</label>
+            {hasGroups ? (
+              <CategoryGroupPicker
+                categories={data.categories}
+                groups={data.categoryGroups}
+                selected={form.category}
+                onSelect={(c) => set('category', c)}
+                hasError={!!errors.category}
+              />
+            ) : (
+              <div className={`cat-pills ${errors.category ? 'cat-pills--error' : ''}`}>
+                {data.categories.map((c) => {
+                  const color = categoryColor(c, data.categories);
+                  const active = form.category === c;
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      className="cat-pill"
+                      style={
+                        active
+                          ? { background: color, borderColor: color, color: '#fff' }
+                          : { background: color + '18', borderColor: color + '70', color }
+                      }
+                      onClick={() => set('category', c)}
+                    >
+                      {c}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {errors.category && <span className="form-error">{errors.category}</span>}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Napomena (opciono)</label>
+            <textarea
+              className="form-textarea"
+              value={form.note}
+              onChange={(e) => set('note', e.target.value)}
+              placeholder="Dodatni detalji..."
             />
-          ) : (
-            <div className={`cat-pills ${errors.category ? 'cat-pills--error' : ''}`}>
-              {data.categories.map((c, i) => {
-                const color = CHART_COLORS[i % CHART_COLORS.length];
-                const active = form.category === c;
-                return (
-                  <button
-                    key={c}
-                    type="button"
-                    className="cat-pill"
-                    style={
-                      active
-                        ? { background: color, borderColor: color, color: '#fff' }
-                        : { background: color + '18', borderColor: color + '70', color }
-                    }
-                    onClick={() => set('category', c)}
-                  >
-                    {c}
-                  </button>
-                );
-              })}
+          </div>
+
+          {!isEdit && (
+            <div className="form-recurring">
+              <button
+                type="button"
+                aria-label="Ponavljajući trošak"
+                className={`btn-recurring ${recurring ? 'btn-recurring--active' : ''}`}
+                onClick={() => setRecurring((v) => !v)}
+              />
+              <span className="form-recurring__label">Ponavljajući trošak — automatski svakog meseca</span>
             </div>
           )}
-          {errors.category && <span className="form-error">{errors.category}</span>}
         </div>
-
-        <div className="form-group">
-          <label className="form-label">Napomena (opciono)</label>
-          <textarea
-            className="form-textarea"
-            value={form.note}
-            onChange={(e) => set('note', e.target.value)}
-            placeholder="Dodatni detalji..."
-          />
-        </div>
-
-        {!isEdit && (
-          <div className="form-recurring">
-            <button
-              type="button"
-              aria-label="Ponavljajući trošak"
-              className={`btn-recurring ${recurring ? 'btn-recurring--active' : ''}`}
-              onClick={() => setRecurring((v) => !v)}
-            >
-              🔁
-            </button>
-            <span className="form-recurring__label">ponavljajući trošak - automatski svaki mesec</span>
-          </div>
-        )}
 
         <div className="modal__footer">
           <button className="btn btn--ghost" onClick={onClose}>Otkaži</button>

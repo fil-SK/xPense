@@ -15,7 +15,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useApp } from '../App.jsx';
 import { exportBudget, importBudget } from '../utils/storage.js';
-import { CHART_COLORS } from '../utils/helpers.js';
+import { categoryColor } from '../utils/helpers.js';
 
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun', 'Jul', 'Avg', 'Sep', 'Okt', 'Nov', 'Dec'];
 
@@ -168,9 +168,9 @@ function SortableFundRow({
                 {categories.length === 0 ? 'Nema kategorija — dodaj ih u Kategorije.' : 'Kategorije:'}
               </span>
               <div className="bg__tracking-pills">
-                {categories.map((cat, i) => {
+                {categories.map((cat) => {
                   const active = mapped.includes(cat);
-                  const color = CHART_COLORS[i % CHART_COLORS.length];
+                  const color = categoryColor(cat, categories);
                   return (
                     <button
                       key={cat}
@@ -299,42 +299,84 @@ export default function BudgetView() {
   return (
     <div className="budget">
       <div className="budget__head">
-        <div className="budget__title">
+        <div className="budget__head-text">
+          <div className="budget__title">Godišnji budžet</div>
+          <div className="budget__hint">
+            Isplaniraj prihode i fondove kroz celu godinu. Klikni na ćeliju da je izmeniš.
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button className="budget__year-nav" onClick={() => setYear((y) => y - 1)}>‹</button>
-          Budžet {year}
+          <div style={{ fontSize: 17, fontWeight: 700, fontVariantNumeric: 'tabular-nums', minWidth: 56, textAlign: 'center' }}>
+            {year}
+          </div>
           <button className="budget__year-nav" onClick={() => setYear((y) => y + 1)}>›</button>
         </div>
-        <div className="budget__hint">
-          Kliknite na ćeliju da unesete vrednost · Dvoklikom na naziv fonda ga preimenujete · 📂 za kategorije · Prevucite ⠿ za redosled
+      </div>
+
+      <div className="budget__summary">
+        <div className="budget__summary-card">
+          <div className="budget__summary-label">
+            <span className="budget__summary-dot" style={{ background: 'var(--primary)' }} />
+            Ukupno prihodi
+          </div>
+          <div className="budget__summary-value">
+            {hasAnyIn ? fmt(totalIn) : '—'} <span className="budget__summary-unit">RSD</span>
+          </div>
         </div>
-        <div className="budget__tools">
-          <button
-            className={`btn btn--sm ${copyConfirm ? 'btn--danger' : 'btn--ghost'}`}
-            onClick={handleCopyToNextYear}
-            title={`Kopiraj fondove i platu iz ${year} u ${year + 1}`}
+        <div className="budget__summary-card">
+          <div className="budget__summary-label">
+            <span className="budget__summary-dot" style={{ background: 'var(--danger)' }} />
+            Ukupno rashodi
+          </div>
+          <div className="budget__summary-value">
+            {hasAnyOut ? fmt(totalOut) : '—'} <span className="budget__summary-unit">RSD</span>
+          </div>
+        </div>
+        <div className="budget__summary-card">
+          <div className="budget__summary-label">
+            <span className="budget__summary-dot" style={{ background: totalBalance >= 0 ? 'var(--primary)' : 'var(--danger)' }} />
+            Bilans (ušteđeno)
+          </div>
+          <div
+            className="budget__summary-value"
+            style={{ color: (hasAnyIn || hasAnyOut) ? (totalBalance >= 0 ? 'var(--primary)' : 'var(--danger)') : 'var(--text)' }}
           >
-            {copyConfirm ? `⚠ Prepiši ${year + 1}?` : `📋 Kopiraj u ${year + 1}`}
-          </button>
-          <button className="btn btn--ghost btn--sm" onClick={() => exportBudget(data.budget, year)}>
-            ⬇ Izvezi budžet
-          </button>
-          <label className="btn btn--ghost btn--sm" style={{ cursor: 'pointer' }}>
-            ⬆ Uvezi budžet
-            <input
-              type="file"
-              accept=".json"
-              style={{ display: 'none' }}
-              onChange={(e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                importBudget(file)
-                  .then(importBudgetData)
-                  .catch((err) => showToast(err.message, 'danger'));
-                e.target.value = '';
-              }}
-            />
-          </label>
+            {(hasAnyIn || hasAnyOut) ? (totalBalance > 0 ? '+' : '') + fmt(totalBalance) : '—'} <span className="budget__summary-unit">RSD</span>
+          </div>
         </div>
+      </div>
+
+      <div className="budget__tools">
+        <button
+          className={`btn btn--sm ${copyConfirm ? 'btn--danger' : 'btn--ghost'}`}
+          onClick={handleCopyToNextYear}
+          title={`Kopiraj fondove i platu iz ${year} u ${year + 1}`}
+        >
+          {copyConfirm ? `⚠ Prepiši ${year + 1}?` : `📋 Kopiraj u ${year + 1}`}
+        </button>
+        <button className="btn btn--ghost btn--sm" onClick={() => exportBudget(data.budget, year)}>
+          ⬇ Izvezi budžet
+        </button>
+        <label className="btn btn--ghost btn--sm" style={{ cursor: 'pointer' }}>
+          ⬆ Uvezi budžet
+          <input
+            type="file"
+            accept=".json"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files[0];
+              if (!file) return;
+              importBudget(file)
+                .then(importBudgetData)
+                .catch((err) => showToast(err.message, 'danger'));
+              e.target.value = '';
+            }}
+          />
+        </label>
+      </div>
+      <div className="budget__hint" style={{ marginBottom: -4 }}>
+        Dvoklikom na naziv fonda ga preimenujete · 📂 za kategorije · Prevucite ⠿ za redosled
       </div>
 
       <div className="budget__scroll">
