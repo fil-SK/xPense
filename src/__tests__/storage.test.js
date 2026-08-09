@@ -1,6 +1,6 @@
 import {
   loadData, saveData, importJSON, importBudget, buildCSVString,
-  hasStoredData, withDefaults,
+  hasStoredData, withDefaults, validateImportData,
 } from '../utils/storage.js';
 
 const KEY = 'expense-tracker-v1';
@@ -145,29 +145,34 @@ describe('importJSON', () => {
     return new File([JSON.stringify(obj)], 'test.json', { type: 'application/json' });
   }
 
-  test('resolves with parsed data for a valid file', async () => {
+  const validExpense = {
+    id: '1', title: 'Test', date: '2025-01-15', amount: 900, category: 'Hrana', note: '',
+  };
+
+  test('resolves with cleaned data and a skipped count for a valid file', async () => {
     const payload = {
-      expenses: [{ id: '1', title: 'Test' }],
+      expenses: [validExpense],
       categories: ['Hrana', 'Transport'],
       budget: {},
       trackingMaps: {},
       recurrings: [{ id: 'r1' }],
     };
-    const result = await importJSON(makeFile(payload));
-    expect(result.expenses).toEqual(payload.expenses);
-    expect(result.categories).toEqual(payload.categories);
-    expect(result.recurrings).toEqual(payload.recurrings);
+    const { data, skipped } = await importJSON(makeFile(payload));
+    expect(skipped).toBe(0);
+    expect(data.expenses).toEqual([validExpense]);
+    expect(data.categories).toEqual(payload.categories);
+    expect(data.recurrings).toEqual(payload.recurrings);
   });
 
   test('backfills missing recurrings with empty array', async () => {
-    const result = await importJSON(makeFile({ expenses: [], categories: ['Hrana'] }));
-    expect(result.recurrings).toEqual([]);
+    const { data } = await importJSON(makeFile({ expenses: [], categories: ['Hrana'] }));
+    expect(data.recurrings).toEqual([]);
   });
 
   test('backfills missing budget and trackingMaps', async () => {
-    const result = await importJSON(makeFile({ expenses: [], categories: ['Hrana'] }));
-    expect(result.budget).toEqual({});
-    expect(result.trackingMaps).toEqual({});
+    const { data } = await importJSON(makeFile({ expenses: [], categories: ['Hrana'] }));
+    expect(data.budget).toEqual({});
+    expect(data.trackingMaps).toEqual({});
   });
 
   test('rejects when required fields are missing', async () => {
@@ -181,6 +186,118 @@ describe('importJSON', () => {
   test('rejects on invalid JSON', async () => {
     const file = new File(['not json'], 'test.json');
     await expect(importJSON(file)).rejects.toThrow();
+  });
+
+  test('drops unusable rows and reports how many', async () => {
+    const payload = {
+      categories: ['Hrana'],
+      expenses: [
+        validExpense,
+        { id: '2', title: 'Bez datuma', amount: 500, category: 'Hrana' },
+        { id: '3', title: 'Bez iznosa', date: '2025-02-01', category: 'Hrana' },
+      ],
+    };
+    const { data, skipped } = await importJSON(makeFile(payload));
+    expect(skipped).toBe(2);
+    expect(data.expenses).toHaveLength(1);
+  });
+});
+
+describe('validateImportData', () => {
+  const valid = { id: '1', title: 'Ručak', date: '2025-01-15', amount: 900, category: 'Hrana', note: '' };
+
+  test('keeps a well-formed expense untouched', () => {
+    const { data, skipped } = validateImportData({ expenses: [valid], categories: ['Hrana'] });
+    expect(skipped).toBe(0);
+    expect(data.expenses[0]).toEqual(valid);
+  });
+
+  test.each([
+    ['a missing date', { id: 'x', title: 'X', amount: 5, category: 'Hrana' }],
+    ['a malformed date', { id: 'x', title: 'X', date: '15.01.2025', amount: 5 }],
+    ['an impossible month', { id: 'x', title: 'X', date: '2025-13-01', amount: 5 }],
+    ['a non-numeric amount', { id: 'x', title: 'X', date: '2025-01-01', amount: 'puno' }],
+    ['a missing amount', { id: 'x', title: 'X', date: '2025-01-01' }],
+    ['a non-object row', 'not an expense'],
+    ['a null row', null],
+  ])('drops a row with %s', (_label, row) => {
+    const { data, skipped } = validateImportData({ expenses: [row], categories: ['Hrana'] });
+    expect(data.expenses).toEqual([]);
+    expect(skipped).toBe(1);
+  });
+
+  test('fills a missing title and category rather than dropping the row', () => {
+    const { data, skipped } = validateImportData({
+      expenses: [{ id: 'x', date: '2025-01-01', amount: 500 }],
+      categories: ['Hrana'],
+    });
+    expect(skipped).toBe(0);
+    expect(data.expenses[0]).toMatchObject({ title: 'Bez naziva', category: 'Ostalo', note: '' });
+  });
+
+  test('repairs an out-of-range day instead of dropping the row', () => {
+    const { data } = validateImportData({
+      expenses: [{ id: 'x', title: 'Kirija', date: '2026-02-31', amount: 40000 }],
+      categories: ['Hrana'],
+    });
+    expect(data.expenses[0].date).toBe('2026-02-28');
+  });
+
+  test('coerces a numeric string amount', () => {
+    const { data } = validateImportData({
+      expenses: [{ id: 'x', title: 'X', date: '2025-01-01', amount: '1500' }],
+      categories: ['Hrana'],
+    });
+    expect(data.expenses[0].amount).toBe(1500);
+  });
+
+  test('gives rows without an id a generated one', () => {
+    const { data } = validateImportData({
+      expenses: [{ title: 'X', date: '2025-01-01', amount: 5 }],
+      categories: ['Hrana'],
+    });
+    expect(typeof data.expenses[0].id).toBe('string');
+    expect(data.expenses[0].id.length).toBeGreaterThan(0);
+  });
+
+  test('de-duplicates repeated ids so React keys stay unique', () => {
+    const { data } = validateImportData({
+      expenses: [
+        { id: 'same', title: 'A', date: '2025-01-01', amount: 5 },
+        { id: 'same', title: 'B', date: '2025-01-02', amount: 6 },
+      ],
+      categories: ['Hrana'],
+    });
+    expect(data.expenses).toHaveLength(2);
+    expect(data.expenses[0].id).not.toBe(data.expenses[1].id);
+  });
+
+  test('preserves recurringId when present', () => {
+    const { data } = validateImportData({
+      expenses: [{ id: 'x', title: 'Netflix', date: '2025-01-01', amount: 800, recurringId: 'r1' }],
+      categories: ['Hrana'],
+    });
+    expect(data.expenses[0].recurringId).toBe('r1');
+  });
+
+  test('drops non-string categories', () => {
+    const { data } = validateImportData({ expenses: [], categories: ['Hrana', 42, null, '  '] });
+    expect(data.categories).toEqual(['Hrana']);
+  });
+
+  test('falls back to default categories when none survive', () => {
+    const { data } = validateImportData({ expenses: [], categories: [null, 7] });
+    expect(data.categories.length).toBeGreaterThan(0);
+    expect(data.categories.every((c) => typeof c === 'string')).toBe(true);
+  });
+
+  test('replaces wrong-typed top-level fields with defaults', () => {
+    const { data } = validateImportData({
+      expenses: [], categories: ['Hrana'], budget: 'nope', savingsGoals: 'nope', monthlyNotes: [],
+    });
+    expect(data.budget).toEqual({});
+    expect(data.savingsGoals).toEqual([]);
+    expect(data.monthlyNotes).toEqual({});
   });
 });
 

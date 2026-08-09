@@ -43,18 +43,22 @@ function repairExpenseDates(expenses) {
 // Single place where a parsed data object is filled out to the full shape.
 // Every entry point (localStorage, JSON import, backup-file recovery) goes
 // through here, so a new top-level field only needs adding to emptyData().
+const asArray = (value, fallback) => (Array.isArray(value) ? value : fallback);
+const asObject = (value, fallback) =>
+  value && typeof value === 'object' && !Array.isArray(value) ? value : fallback;
+
 export function withDefaults(parsed) {
   const base = emptyData();
   if (!parsed || typeof parsed !== 'object') return base;
   return {
-    expenses: repairExpenseDates(parsed.expenses ?? base.expenses),
-    categories: parsed.categories ?? base.categories,
-    budget: parsed.budget ?? base.budget,
-    trackingMaps: parsed.trackingMaps ?? base.trackingMaps,
-    recurrings: parsed.recurrings ?? base.recurrings,
-    monthlyNotes: parsed.monthlyNotes ?? base.monthlyNotes,
-    savingsGoals: parsed.savingsGoals ?? base.savingsGoals,
-    categoryGroups: parsed.categoryGroups ?? base.categoryGroups,
+    expenses: repairExpenseDates(asArray(parsed.expenses, base.expenses)),
+    categories: asArray(parsed.categories, base.categories),
+    budget: asObject(parsed.budget, base.budget),
+    trackingMaps: asObject(parsed.trackingMaps, base.trackingMaps),
+    recurrings: asArray(parsed.recurrings, base.recurrings),
+    monthlyNotes: asObject(parsed.monthlyNotes, base.monthlyNotes),
+    savingsGoals: asArray(parsed.savingsGoals, base.savingsGoals),
+    categoryGroups: asArray(parsed.categoryGroups, base.categoryGroups),
   };
 }
 
@@ -93,6 +97,79 @@ export function exportJSON(data) {
   URL.revokeObjectURL(url);
 }
 
+function newId() {
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `imp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+// Accepts only a well-formed calendar date, repairing an out-of-range day the
+// same way stored records are repaired. Returns null when the value can't be
+// placed in time at all.
+function normalizeDate(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (!m) return null;
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  if (month < 1 || month > 12 || day < 1) return null;
+  return clampISODate(trimmed);
+}
+
+// Coerces one imported expense into a shape the app can render, or returns null
+// when the row is unusable. Only a missing date or a non-numeric amount is
+// fatal — everything else is filled in, because dropping a whole expense over a
+// missing note would lose real data. Exported files are routinely hand-edited
+// (the export button is labelled "za Claude"), so malformed rows are expected.
+function sanitizeExpense(raw, seenIds) {
+  if (!raw || typeof raw !== 'object') return null;
+
+  const date = normalizeDate(raw.date);
+  if (!date) return null;
+
+  const amount = Number(raw.amount);
+  if (!Number.isFinite(amount)) return null;
+
+  let id = typeof raw.id === 'string' && raw.id ? raw.id : newId();
+  while (seenIds.has(id)) id = newId();
+  seenIds.add(id);
+
+  const expense = {
+    id,
+    date,
+    amount,
+    title: typeof raw.title === 'string' && raw.title.trim() ? raw.title : 'Bez naziva',
+    category: typeof raw.category === 'string' && raw.category.trim() ? raw.category : 'Ostalo',
+    note: typeof raw.note === 'string' ? raw.note : '',
+  };
+  if (typeof raw.recurringId === 'string') expense.recurringId = raw.recurringId;
+  return expense;
+}
+
+// Fills the shape out, then makes every expense safe to render. Returns the
+// cleaned data plus how many rows had to be dropped, so the UI can say so
+// instead of silently losing them.
+export function validateImportData(parsed) {
+  const base = withDefaults(parsed);
+  const seenIds = new Set();
+  const expenses = [];
+  let skipped = 0;
+
+  for (const raw of base.expenses) {
+    const clean = sanitizeExpense(raw, seenIds);
+    if (clean) expenses.push(clean);
+    else skipped++;
+  }
+
+  let categories = base.categories.filter((c) => typeof c === 'string' && c.trim());
+  // An import with no usable categories would leave the app unable to add an
+  // expense at all, so fall back to the defaults.
+  if (categories.length === 0) categories = emptyData().categories;
+
+  return { data: { ...base, expenses, categories }, skipped };
+}
+
 export function importJSON(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -103,7 +180,7 @@ export function importJSON(file) {
           reject(new Error('Neispravan format fajla.'));
           return;
         }
-        resolve(withDefaults(parsed));
+        resolve(validateImportData(parsed));
       } catch {
         reject(new Error('Neispravan JSON fajl.'));
       }

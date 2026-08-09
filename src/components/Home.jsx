@@ -4,6 +4,7 @@ import { getExpensesForMonth, getTotalAmount, formatAmount, getMonthName, todayI
 import { exportJSON, exportCSV, importJSON } from '../utils/storage.js';
 import SavingsGoals from './SavingsGoals.jsx';
 import ExpenseModal from './ExpenseModal.jsx';
+import ImportConfirmModal from './ImportConfirmModal.jsx';
 import ExpenseItem from './ExpenseItem.jsx';
 import BudgetPanel from './BudgetPanel.jsx';
 import Charts from './Charts.jsx';
@@ -12,6 +13,7 @@ export default function Home() {
   const { data, navigateTo, importData, showToast, deleteRecurring } = useApp();
   const [adding, setAdding] = useState(false);
   const [showCharts, setShowCharts] = useState(false);
+  const [pendingImport, setPendingImport] = useState(null);
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
@@ -25,13 +27,20 @@ export default function Home() {
   const lastTotal = getTotalAmount(lastMonth);
   const delta = lastTotal > 0 ? ((total - lastTotal) / lastTotal) * 100 : null;
 
+  // Import never applies straight away — it replaces every record, so the user
+  // gets to compare the counts first.
   function handleImport(e) {
     const file = e.target.files[0];
     if (!file) return;
     importJSON(file)
-      .then(importData)
+      .then(setPendingImport)
       .catch((err) => showToast(err.message, 'danger'));
     e.target.value = '';
+  }
+
+  function confirmImport() {
+    importData(pendingImport.data, { skipped: pendingImport.skipped });
+    setPendingImport(null);
   }
 
   return (
@@ -45,7 +54,7 @@ export default function Home() {
         </div>
         <button className="home__add-btn" onClick={() => setAdding(true)} aria-label="Dodaj trošak">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
-          + Novi trošak
+          Novi trošak
         </button>
       </div>
 
@@ -162,6 +171,16 @@ export default function Home() {
 
       {adding && (
         <ExpenseModal defaultDate={todayISO()} onClose={() => setAdding(false)} />
+      )}
+
+      {pendingImport && (
+        <ImportConfirmModal
+          current={data}
+          incoming={pendingImport.data}
+          skipped={pendingImport.skipped}
+          onCancel={() => setPendingImport(null)}
+          onConfirm={confirmImport}
+        />
       )}
     </div>
   );

@@ -30,7 +30,35 @@
   --accent2: #4f46e5;
   --sidebar-bg: #f8fafc;
   --font-display: 'Sora', system-ui, -apple-system, sans-serif;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
 }
+
+/* ── Scrollbars ──
+   Replaces the OS default (a bright grey slab on Windows) everywhere the app
+   scrolls: the main column, the sidebar, the modal body, the budget grid.
+   Chrome 121+ honours the standard properties and ignores the ::-webkit-*
+   rules below; older Chromium uses the ::-webkit-* rules. Both are themed, so
+   either path matches the app. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+  /* transparent border + padding-box clip slims the thumb without shrinking
+     the hit area */
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-corner { background: transparent; }
 
 body {
   font-family: var(--font-display), sans-serif;
@@ -696,6 +724,40 @@ body {
 }
 .modal__footer .btn { flex: 1; justify-content: center; padding: 14px; font-size: 14.5px; border-radius: var(--radius-sm); }
 
+/* ── Import confirmation ── */
+.import-warn {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.import-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.import-table th {
+  text-align: right;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 0 0 8px;
+}
+.import-table th:first-child { text-align: left; }
+.import-table td { padding: 8px 0; border-top: 1px solid var(--border); }
+.import-table__label { color: var(--text-muted); }
+.import-table__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.import-table__num--loss { color: var(--danger); }
+.import-skipped {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--warning-light);
+  color: var(--warning);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 /* ── Form ── */
 .form-group { display: flex; flex-direction: column; gap: 9px; margin-bottom: 20px; }
 .form-group:last-of-type { margin-bottom: 0; }
@@ -1004,6 +1066,20 @@ input[type="number"].form-input {
 }
 .toast--success { background: var(--success); color: #fff; }
 .toast--danger { background: var(--danger); color: #fff; }
+.toast { display: flex; align-items: center; gap: 14px; }
+/* An actionable toast must outlive the shared 2.5s fade-out keyframe. */
+.toast:has(.toast__action) { animation: toastIn .2s ease, toastOut .25s ease 8.5s forwards; }
+.toast__action {
+  background: rgba(255, 255, 255, .22);
+  border: 1px solid rgba(255, 255, 255, .45);
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.toast__action:hover { background: rgba(255, 255, 255, .34); }
 @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
 @keyframes toastOut { to { opacity: 0; transform: translateX(-50%) translateY(10px); } }
 
@@ -1357,12 +1433,18 @@ thead .bg__col--current { background: #e0e7ff !important; }
   background: var(--bg);
   border-bottom: 2px solid var(--primary-light);
 }
-.bg__tracking-cell { padding: 10px 16px 14px; }
+/* Inset the panel from the row edges on all four sides, so the pills never sit
+   flush against the grid borders. */
+.bg__tracking-cell { padding: 14px 18px 18px; }
 .bg__tracking-panel {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 16px;
   width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
 }
 .bg__tracking-label {
   font-size: 11px;
@@ -1371,9 +1453,9 @@ thead .bg__col--current { background: #e0e7ff !important; }
   text-transform: uppercase;
   letter-spacing: .4px;
   white-space: nowrap;
-  padding-top: 5px;
+  padding-top: 6px;
 }
-.bg__tracking-pills { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
+.bg__tracking-pills { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; min-width: 0; }
 
 /* Add fund row */
 .bg__add-row > td { border-top: 1px dashed var(--border); }
@@ -1773,6 +1855,8 @@ html.dark {
   --sh-sm: 0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
   --sh: 0 4px 12px rgba(0,0,0,.4), 0 2px 4px rgba(0,0,0,.3);
   --sh-lg: 0 24px 64px rgba(0,0,0,.55);
+  --scrollbar-thumb: #33403a;
+  --scrollbar-thumb-hover: #4a5a51;
 }
 html.dark .btn--primary,
 html.dark .home__add-btn { color: #08120c; }
@@ -1784,6 +1868,9 @@ html.dark thead .bg__col--current { background: rgba(43,212,124,.14) !important;
 html.dark .bg__subtotal-row > td { background: rgba(255,255,255,.02); }
 html.dark .bg__section-row td { background: var(--bg3); }
 html.dark .bg__tracking-row > td { background: var(--bg-card); }
+/* The row behind it is already --bg-card in dark, so lift the panel a step
+   instead of painting it the same colour. */
+html.dark .bg__tracking-panel { background: var(--bg3); }
 
 /* Inputs inside budget grid */
 html.dark .bgc-input,

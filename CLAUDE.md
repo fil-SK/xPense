@@ -24,9 +24,9 @@ Test files live in `src/__tests__/`. Setup file is `src/test/setup.js` (clears l
 
 **Test workflow:** For every new feature or edit, write tests in the relevant file(s) before reporting done, then run `npm test` to confirm nothing is broken. If a new pure utility is added, test it in the helpers or dataTransforms suite. If a new component is added, add a `.test.jsx` file for it.
 
-**Current test files (237 tests, 15 files):**
+**Current test files (275 tests, 17 files):**
 - `helpers.test.js` — all pure functions in `utils/helpers.js`, incl. `lastDayOfMonth` / `isoDate` / `clampISODate` day-clamping and `categoryColor` stability
-- `storage.test.js` — `loadData`, `saveData`, `importJSON`, `importBudget`, `buildCSVString`, `hasStoredData`, `withDefaults` (incl. expense-date repair)
+- `storage.test.js` — `loadData`, `saveData`, `importJSON` (now resolves `{ data, skipped }`), `importBudget`, `buildCSVString`, `hasStoredData`, `withDefaults` (incl. expense-date repair), `validateImportData` sanitising
 - `dataTransforms.test.js` — `generateRecurringExpenses` (incl. `skippedMonths` and day clamping), `applyBudgetCopy`, `isEmptyData`, `applyExpenseDeletion` (incl. the delete→regenerate round trip)
 - `App.boot.test.jsx` — startup recovery from the backup file (fileStorage mocked): restore when localStorage is empty, skip when it isn't, never write the file on a failed or invalid read, wait for permission
 - `GlobalSearch.test.jsx` — rendering, search filtering, navigation callbacks
@@ -35,7 +35,9 @@ Test files live in `src/__tests__/`. Setup file is `src/test/setup.js` (clears l
 - `Charts.test.jsx` — `CHART_THEME` light/dark key parity and color-format sanity (no rendering; recharts needs a layout engine)
 - `SavingsGoals.test.jsx` — empty state, add form, progress calculation, two-click delete
 - `Header.test.jsx` — Praćenje absent, Prethodne button render/active states, theme toggle
-- `Home.test.jsx` — quick-add circle button, modal open/close, removed Prethodne card
+- `Home.test.jsx` — quick-add circle button, modal open/close, removed Prethodne card, JSON import (confirm dialog appears instead of importing, confirm/cancel paths, malformed file)
+- `ImportConfirmModal.test.jsx` — replace warning, current-vs-incoming counts, loss highlighting, skipped wording, confirm/cancel/Escape
+- `App.import.test.jsx` — full import round trip through App: confirm replaces stored data, toast offers undo, undo restores every replaced expense
 - `BudgetPanel.test.jsx` — null render, fund rows, amounts, remaining, "nije postavljeno"
 - `PreviousSpendings.test.jsx` — 12-card grid, note snippet, truncation, empty state
 - `BudgetView.test.jsx` — category chip render/count, inline panel expand/collapse, one-at-a-time, pill add/remove calls
@@ -92,6 +94,13 @@ Recovery rules, all of which exist to protect the backup file:
 `App.boot.test.jsx` covers these paths with `src/utils/fileStorage.js` mocked; three of its cases fail against the pre-fix boot order.
 
 `src/utils/storage.js` handles localStorage read/write, JSON import/export, and CSV export (`buildCSVString` + `exportCSV`). The BOM prefix in `exportCSV` ensures Excel opens the file with correct UTF-8 encoding.
+
+**Import is guarded in three stages**, because it replaces every record and the export button is labelled "za Claude" — hand-edited files are an expected input, not an exotic one:
+1. `importJSON` rejects anything that isn't recognisably an xPense export (`expenses`/`categories` must be arrays).
+2. `validateImportData` sanitises each expense and returns `{ data, skipped }`. Only an unusable date or a non-numeric amount drops a row; a missing title becomes `'Bez naziva'`, a missing category `'Ostalo'`, missing ids are generated, and duplicate ids are re-issued so React keys stay unique. Out-of-range days are repaired rather than rejected. `withDefaults` type-checks each top-level field, so a wrong-typed `budget` can no longer reach the UI.
+3. `ImportConfirmModal` shows current-vs-incoming counts (shrinking numbers flagged in `--danger`) plus any skipped count, and nothing is applied until the user confirms.
+
+After applying, `importData` puts the pre-import snapshot behind a **"Poništi" action on the toast**. `showToast(msg, type, { action, duration })` renders a button inside the toast and extends its lifetime to 9s (the CSS fade-out is delayed via `.toast:has(.toast__action)`). Note the dismiss handler clears the toast only when the action didn't raise one of its own — otherwise the follow-up toast is wiped instantly.
 `src/utils/fileStorage.js` handles IndexedDB handle storage and File System Access API read/write.
 
 When adding a new top-level field to the data shape, add it to **`emptyData()` and `withDefaults()` in `storage.js` only**. Every entry point — `loadData()` (all three returns), `importJSON`, and the file-recovery path in `App.jsx` — routes through those two functions. Consider whether `isEmptyData()` in `dataTransforms.js` should treat the field as content.
@@ -145,6 +154,8 @@ Known edge: editing a generated expense's date into a different month leaves the
 ### Styling
 
 All styles are in `src/index.css` — one flat file, BEM-ish class names per component (`.budget__*`, `.bg__*`, `.cat-*`, `.bp-*`, `.gsearch__*`, `.goal-*`, etc.). Dark mode uses `html.dark` class toggled on `document.documentElement`; CSS variables are overridden in the `html.dark {}` block at the bottom of the file. Always use `var(--text)`, `var(--bg-card)`, etc. on new inputs/elements so they respect the theme automatically.
+
+Scrollbars are themed globally at the top of the file via `*` + `*::-webkit-scrollbar`, driven by `--scrollbar-thumb` / `--scrollbar-thumb-hover`. Chrome 121+ honours the standard `scrollbar-width`/`scrollbar-color` properties and ignores the `::-webkit-*` rules; older Chromium uses the `::-webkit-*` rules. Both are defined so either path stays on-theme — if you restyle one, restyle the other.
 
 **Never hardcode a hex color in a component.** The dark palette is green-primary (`--primary: #2bd47c`) while light is indigo (`#6366f1`), so a literal like `#6366f1` is not merely off-shade in dark mode — it's the wrong hue entirely. Use `var(--…)` in inline styles, or a class. Toggle buttons use `.btn--toggled` (generic) or `.section-head__toggle--active`; both resolve to `var(--soft)` / `var(--primary)`. The only legitimate literals left in components are `CHART_THEME` in `Charts.jsx` (SVG can't read CSS vars) and `color: '#fff'` on pills whose background is a saturated `CHART_COLORS` value.
 

@@ -43,10 +43,16 @@ export default function App() {
   const dataRef = useRef(data);
   useEffect(() => { dataRef.current = data; }, [data]);
 
-  const showToast = useCallback((msg, type = 'success') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 2800);
+  // `action` renders a button inside the toast (e.g. undo) and keeps it up
+  // longer, since it needs to be read and clicked rather than just noticed.
+  const toastTimerRef = useRef(null);
+  const showToast = useCallback((msg, type = 'success', { action = null, duration } = {}) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ msg, type, action });
+    toastTimerRef.current = setTimeout(() => setToast(null), duration ?? (action ? 9000 : 2800));
   }, []);
+
+  useEffect(() => () => clearTimeout(toastTimerRef.current), []);
 
   useEffect(() => {
     if (bootState !== 'ready') return;
@@ -305,9 +311,26 @@ export default function App() {
     }));
   }, []);
 
-  const importData = useCallback((imported) => {
+  const importData = useCallback((imported, { skipped = 0 } = {}) => {
+    // Import replaces everything, so keep the previous state reachable for as
+    // long as the toast is up.
+    const snapshot = dataRef.current;
     setData(imported);
-    showToast('Podaci uvezeni uspešno.');
+    showToast(
+      skipped > 0
+        ? `Podaci uvezeni — ${skipped} stavki preskočeno.`
+        : 'Podaci uvezeni uspešno.',
+      'success',
+      {
+        action: {
+          label: 'Poništi',
+          onClick: () => {
+            setData(snapshot);
+            showToast('Uvoz poništen.', 'danger');
+          },
+        },
+      }
+    );
   }, [showToast]);
 
   const importBudgetData = useCallback((budgetData) => {
@@ -508,7 +531,21 @@ export default function App() {
 
         {toast && (
           <div className={`toast toast--${toast.type}`}>
-            {toast.type === 'success' ? '✓' : '✕'} {toast.msg}
+            <span>{toast.type === 'success' ? '✓' : '✕'} {toast.msg}</span>
+            {toast.action && (
+              <button
+                className="toast__action"
+                onClick={() => {
+                  const dismissed = toast;
+                  toast.action.onClick();
+                  // Only clear if the action didn't raise a toast of its own,
+                  // which would otherwise be wiped out immediately.
+                  setToast((t) => (t === dismissed ? null : t));
+                }}
+              >
+                {toast.action.label}
+              </button>
+            )}
           </div>
         )}
       </div>
