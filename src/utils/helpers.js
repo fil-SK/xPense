@@ -69,6 +69,16 @@ export function getExpensesForMonth(expenses, year, month) {
   return expenses.filter((e) => e.date?.startsWith(prefix));
 }
 
+// Narrows a list to the named categories. An empty (or absent) selection means
+// "no filter" and returns the list untouched — the alternative reading, "match
+// nothing", would make a freshly-opened filter panel blank the month.
+// Accepts an array or a Set so callers can keep whichever they hold in state.
+export function filterByCategories(expenses, selected) {
+  const set = selected instanceof Set ? selected : new Set(selected ?? []);
+  if (set.size === 0) return expenses;
+  return expenses.filter((e) => set.has(e.category));
+}
+
 // Every summation of expense amounts goes through here. `withDefaults` already
 // guarantees numeric amounts on anything loaded or imported, so the Number() is
 // a second line of defence rather than the primary one — but it is what makes

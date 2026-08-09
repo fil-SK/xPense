@@ -2,7 +2,47 @@ import {
   formatAmount, formatDate, todayISO,
   getExpensesForMonth, getTotalAmount, getByCategory, getAvailableMonths,
   lastDayOfMonth, isoDate, clampISODate, categoryColor, CHART_COLORS, monthKey,
+  filterByCategories,
 } from '../utils/helpers.js';
+
+describe('filterByCategories', () => {
+  const expenses = [
+    { id: '1', category: 'Hrana', amount: 100 },
+    { id: '2', category: 'Struja', amount: 200 },
+    { id: '3', category: 'Voda', amount: 300 },
+    { id: '4', category: 'Hrana', amount: 400 },
+  ];
+
+  // An empty selection is "no filter", not "match nothing" — the opposite
+  // reading blanks the month the moment the filter panel opens.
+  test('returns the list untouched for an empty selection', () => {
+    expect(filterByCategories(expenses, [])).toBe(expenses);
+    expect(filterByCategories(expenses, new Set())).toBe(expenses);
+    expect(filterByCategories(expenses, undefined)).toBe(expenses);
+  });
+
+  test('keeps only expenses in the selected categories', () => {
+    expect(filterByCategories(expenses, ['Hrana']).map((e) => e.id)).toEqual(['1', '4']);
+  });
+
+  test('a multi-category selection is a union, not an intersection', () => {
+    expect(filterByCategories(expenses, ['Struja', 'Voda']).map((e) => e.id)).toEqual(['2', '3']);
+  });
+
+  test('accepts a Set as well as an array', () => {
+    expect(filterByCategories(expenses, new Set(['Voda'])).map((e) => e.id)).toEqual(['3']);
+  });
+
+  test('a category with nothing in the list yields no rows', () => {
+    expect(filterByCategories(expenses, ['Nepostojeća'])).toEqual([]);
+  });
+
+  test('does not mutate the input', () => {
+    const copy = expenses.map((e) => ({ ...e }));
+    filterByCategories(expenses, ['Hrana']);
+    expect(expenses).toEqual(copy);
+  });
+});
 
 describe('categoryColor', () => {
   const categories = ['Hrana', 'Transport', 'Zabava'];
