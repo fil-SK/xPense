@@ -381,6 +381,29 @@ export default function App() {
     },
     renameBudgetFund: (year, fundId, name) =>
       dispatch({ type: 'budget/renameFund', payload: { year, fundId, name } }),
+    // Silent, like updateTrackingMap: the chip's pressed state and the 📂 chip
+    // disappearing are the feedback, and a toast here would wipe a pending undo
+    // from a delete the user just did in the same grid.
+    setBudgetFundKind: (year, fundId, kind) =>
+      dispatch({ type: 'budget/setFundKind', payload: { year, fundId, kind } }),
+    // Also silent — the row visibly flips from an input to "✓ 15.000 RSD".
+    confirmFundContribution: (year, fundId, monthIdx, value) =>
+      dispatch({ type: 'budget/setFundContribution', payload: { year, fundId, monthIdx, value } }),
+    // Un-confirming throws away a number the user typed by hand, which re-
+    // confirming would not bring back (it offers the *planned* figure), so it
+    // is a delete and gets the undo. Only `budget` holds a contribution.
+    clearFundContribution: (year, fundId, monthIdx) => {
+      deleteWithUndo(
+        ['budget'],
+        () =>
+          dispatch({
+            type: 'budget/setFundContribution',
+            payload: { year, fundId, monthIdx, value: null },
+          }),
+        'Potvrda odvajanja uklonjena.',
+        'Potvrda vraćena.'
+      );
+    },
     reorderBudgetFunds: (year, orderedIds) =>
       dispatch({ type: 'budget/reorderFunds', payload: { year, orderedIds } }),
     copyBudgetToYear: (fromYear, toYear) =>

@@ -1,0 +1,122 @@
+/* Component: components/SavingsPanel.jsx — per-month confirmation that a
+   savings fund's money was actually set aside. Mirrors budget-panel.css. */
+
+.sp {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 44px;
+}
+.sp__label {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  color: var(--text);
+}
+.sp__rows {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px 24px 4px;
+  box-shadow: var(--sh-sm);
+}
+.sp__summary {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  margin-top: -6px;
+}
+
+.sp-row {
+  display: grid;
+  grid-template-columns: 9px minmax(90px, 190px) auto 1fr;
+  align-items: center;
+  gap: 16px;
+  padding: 13px 0;
+  border-top: 1px solid var(--border2);
+}
+.sp-row:first-child { border-top: none; }
+
+.sp-row__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sp-row--confirmed .sp-row__dot { background: var(--success); }
+.sp-row--pending   .sp-row__dot { background: var(--border); }
+
+.sp-row__name {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sp-row__plan {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.sp-row__form,
+.sp-row__done {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+/* The fund name is the row's visible title, so the label is there to give the
+   input an accessible name rather than to be read — one visible "Iznos" per
+   row would say nothing about which fund it belongs to. */
+.sp-row__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.sp-row__input {
+  width: 110px;
+  padding: 7px 10px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+.sp-row__input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--soft);
+}
+
+.sp-row__amount {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--success);
+}
+.sp-row__amount--short { color: var(--warning); }
+
+.sp-row__delta {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}

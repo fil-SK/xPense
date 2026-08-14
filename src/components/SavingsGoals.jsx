@@ -1,7 +1,7 @@
 import { useState, useId } from 'react';
 import { useApp } from '../App.jsx';
 import { formatAmount } from '../utils/helpers.js';
-import { goalProgress } from '../utils/dataTransforms.js';
+import { goalProgress, isSavingsFund, NO_PROGRESS } from '../utils/dataTransforms.js';
 
 function getBarClass(pct) {
   if (pct >= 100) return 'goal-bar__fill--done';
@@ -30,13 +30,12 @@ export default function SavingsGoals() {
 
   const availableFunds = data.budget?.[goalYear]?.funds ?? [];
 
-  const NO_FUND = { saved: 0, planned: 0, pct: 0, plannedPct: 0, elapsed: 0 };
-
-  // Progress is "saved so far", not "planned for the year" — see goalProgress.
+  // Progress is what the user confirmed setting aside, not what the year plans
+  // to set aside — see goalProgress.
   function getProgress(goal) {
-    if (!goal.fundId || !goal.year) return NO_FUND;
+    if (!goal.fundId || !goal.year) return NO_PROGRESS;
     const fund = data.budget?.[goal.year]?.funds?.find((f) => f.id === goal.fundId);
-    if (!fund) return NO_FUND;
+    if (!fund) return NO_PROGRESS;
     return goalProgress(fund, goal.target, goal.year);
   }
 
@@ -162,13 +161,18 @@ export default function SavingsGoals() {
       {goals.length > 0 ? (
         <div className="goal-list">
           {goals.map((goal) => {
-            const { saved, planned, pct, plannedPct } = getProgress(goal);
+            const { saved, planned, expected, pct, plannedPct, expectedPct, confirmedMonths } =
+              getProgress(goal);
             const linkedFund = goal.fundId && goal.year
               ? data.budget?.[goal.year]?.funds?.find((f) => f.id === goal.fundId)
               : null;
+            // What the plan said should be set aside by now, as opposed to what
+            // was. This is the number the bar itself used to show.
+            const showExpected = !!linkedFund && expected !== saved;
             // The rest of the year's plan, shown as a ghost segment behind the
-            // bar so the number that used to be the progress is still visible.
-            const showPlan = !!linkedFund && planned > saved;
+            // bar so the whole plan stays visible rather than being dropped.
+            const showPlan = !!linkedFund && planned > expected;
+            const showGhost = !!linkedFund && plannedPct > pct;
             return (
               <div key={goal.id} className="goal-item">
                 <div className="goal-item__head">
@@ -207,7 +211,7 @@ export default function SavingsGoals() {
                   aria-valuenow={Math.round(pct)}
                   aria-valuetext={`Ušteđeno ${formatAmount(saved)} od ${formatAmount(goal.target)} (${Math.round(pct)}%)`}
                 >
-                  {showPlan && (
+                  {showGhost && (
                     <div className="goal-bar__plan" style={{ width: `${plannedPct}%` }} />
                   )}
                   <div className={`goal-bar__fill ${getBarClass(pct)}`} style={{ width: `${pct}%` }} />
@@ -215,9 +219,23 @@ export default function SavingsGoals() {
                 <div className="goal-item__amounts">
                   Ušteđeno: {formatAmount(saved)} / {formatAmount(goal.target)} ({Math.round(pct)}%)
                 </div>
+                {showExpected && (
+                  <div className="goal-item__plan">
+                    Očekivano do sada: {formatAmount(expected)} ({Math.round(expectedPct)}%)
+                  </div>
+                )}
                 {showPlan && (
                   <div className="goal-item__plan">
                     Po planu do kraja {goal.year}: {formatAmount(planned)} ({Math.round(plannedPct)}%)
+                  </div>
+                )}
+                {/* A 0% bar on a funded goal looks like a bug unless it says
+                    what is missing — and the missing step differs. */}
+                {linkedFund && confirmedMonths === 0 && (
+                  <div className="goal-item__plan">
+                    {isSavingsFund(linkedFund)
+                      ? 'Nema potvrđenih odvajanja — potvrdi ih u prikazu meseca, sekcija „Odvajanja".'
+                      : 'Fond nije označen kao fond štednje — uključi 💰 u Budžetu da bi se odvajanja pratila.'}
                   </div>
                 )}
                 {!linkedFund && (

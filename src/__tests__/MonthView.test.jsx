@@ -23,6 +23,8 @@ function renderMonthView(dataOverrides = {}, ctxOverrides = {}) {
     prevView: null,
     setMonthlyNote,
     deleteExpense,
+    confirmFundContribution: vi.fn(),
+    clearFundContribution: vi.fn(),
     ...ctxOverrides,
   };
   render(
@@ -32,6 +34,48 @@ function renderMonthView(dataOverrides = {}, ctxOverrides = {}) {
   );
   return { setMonthlyNote, navigateTo, deleteExpense };
 }
+
+describe('MonthView — Odvajanja section', () => {
+  const savingsBudget = {
+    2025: {
+      income: { plata: Array(12).fill(null), bonus: Array(12).fill(null) },
+      funds: [{ id: 'f-save', name: 'Putovanje', amounts: Array(12).fill(20000), kind: 'savings' }],
+    },
+  };
+
+  // Nothing appears until a fund is flagged, which is what keeps the rest of
+  // this suite's fixtures unaffected.
+  test('is absent when the year has no savings fund', () => {
+    renderMonthView();
+    expect(screen.queryByText('Odvajanja')).not.toBeInTheDocument();
+  });
+
+  test('renders between the budget panel and the toolbar', () => {
+    const { container } = render(
+      <AppContext.Provider
+        value={{
+          data: {
+            expenses: [], categories: ['Hrana'], categoryGroups: [],
+            budget: savingsBudget, trackingMaps: {}, recurrings: [],
+            monthlyNotes: {}, savingsGoals: [],
+          },
+          navigateTo: vi.fn(),
+          prevView: null,
+          setMonthlyNote: vi.fn(),
+          deleteExpense: vi.fn(),
+          confirmFundContribution: vi.fn(),
+          clearFundContribution: vi.fn(),
+        }}
+      >
+        <MonthView year={2025} month={2} />
+      </AppContext.Provider>
+    );
+    expect(screen.getByText('Odvajanja')).toBeInTheDocument();
+    const sections = [...container.querySelectorAll('.month-note, .sp, .toolbar')];
+    expect(sections.map((el) => el.className.split(' ')[0]))
+      .toEqual(['month-note', 'sp', 'toolbar']);
+  });
+});
 
 describe('MonthView — back navigation', () => {
   test('back button uses prevView from context when set', async () => {

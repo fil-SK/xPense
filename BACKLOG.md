@@ -3,6 +3,44 @@
 Known gaps that were consciously deferred, with enough context to pick them up cold.
 Newest first. Remove an entry when it ships.
 
+## Savings: nothing stops you confirming a month that hasn't happened
+
+**Deferred:** 2026-08-14, while adding savings funds and confirmed contributions.
+
+`SavingsPanel` renders the same controls for every month, including future ones.
+`PreviousSpendings` disables future month cards, but `MonthView` for a future month is
+still reachable through search and through `selectedMonth`, and the panel will happily
+accept a confirmation there. `goalProgress` counts it toward `saved` on purpose — a
+confirmation ahead of the calendar is a real thing when someone funds a whole quarter
+at once — so this is only a problem for the accidental case.
+
+**Proposed fix:** compare `year`/`month` against the clock in `SavingsPanel` and render
+the confirmed/pending state read-only for a month that hasn't started, leaving the row
+visible so the plan is still legible. One guard around the form branch, two tests.
+
+**Effort:** small. Left out to keep the panel's behaviour uniform across months.
+
+---
+
+## Savings: re-importing a budget discards that year's confirmations
+
+**Deferred:** 2026-08-14, same session.
+
+`budget/import` replaces `budget[year]` wholesale, and confirmations live on the fund
+objects inside it. That is exactly what makes them self-consistent — fund ids and their
+confirmations always travel together, so a re-import can never orphan one or attach it to
+the wrong fund, which is the bug a parallel top-level map would have had. The cost is
+that "re-import last year's budget" silently drops that year's confirmation record.
+
+**Proposed fix:** have `ImportConfirmModal` count confirmations in the incoming file
+against the current data for the affected years and warn when the number shrinks, the
+same way it already flags shrinking expense counts. No data-shape change.
+
+**Effort:** small. A count and a line of copy in a modal that already does this for
+other fields.
+
+---
+
 ## Recurring expenses: the start date still can't be edited
 
 **Deferred:** 2026-08-09, while adding edit for recurring templates.

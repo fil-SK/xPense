@@ -9,6 +9,7 @@ import ExpenseItem from './ExpenseItem.jsx';
 import ExpenseModal from './ExpenseModal.jsx';
 import Charts from './Charts.jsx';
 import BudgetPanel from './BudgetPanel.jsx';
+import SavingsPanel from './SavingsPanel.jsx';
 
 const SORT_OPTIONS = [
   { value: 'date-desc', label: 'Datum (noviji)' },
@@ -270,6 +271,8 @@ export default function MonthView({ year, month, isCurrent }) {
       </div>
 
       <BudgetPanel year={year} month={month} />
+
+      <SavingsPanel year={year} month={month} />
 
       <div className="toolbar">
         <input

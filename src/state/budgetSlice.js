@@ -84,6 +84,43 @@ export const budgetHandlers = {
     );
   },
 
+  // `kind` is dropped rather than set to null when the fund goes back to being
+  // a spending fund, so it stays byte-identical to one that was never toggled —
+  // "absent means spending" then holds literally, including in export files.
+  // Nothing else on the fund is touched, so flipping the flag is lossless in
+  // both directions: the amounts, any confirmations and the category mapping
+  // all survive and come back if it is flipped again.
+  'budget/setFundKind': (data, { year, fundId, kind }) => {
+    const yb = getYearBudget(data, year);
+    return setFunds(
+      data,
+      year,
+      yb.funds.map((f) => {
+        if (f.id !== fundId) return f;
+        const { kind: _prev, ...rest } = f;
+        return kind ? { ...rest, kind } : rest;
+      })
+    );
+  },
+
+  // What the user confirmed actually setting aside, as opposed to what the plan
+  // in `amounts` says. `null` un-confirms the month — no separate action type,
+  // matching how clearing a budget cell writes `null` to `amounts`.
+  'budget/setFundContribution': (data, { year, fundId, monthIdx, value }) => {
+    const yb = getYearBudget(data, year);
+    return setFunds(
+      data,
+      year,
+      yb.funds.map((f) => {
+        if (f.id !== fundId) return f;
+        // Absent until the first confirmation, so the array is minted here
+        // rather than on every fund that will never need one.
+        const base = f.contributions ?? Array(12).fill(null);
+        return { ...f, contributions: base.map((v, i) => (i === monthIdx ? value : v)) };
+      })
+    );
+  },
+
   'budget/addFund': (data, { year, fund }) =>
     setFunds(data, year, [...getYearBudget(data, year).funds, fund]),
 

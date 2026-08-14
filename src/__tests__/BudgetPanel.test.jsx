@@ -48,6 +48,38 @@ describe('BudgetPanel — renders nothing without tracking', () => {
   });
 });
 
+// A savings fund's money is set aside, not spent, so it must never be measured
+// against expenses — including any categories it still carries from before it
+// was flagged, which the toggle deliberately leaves in place.
+describe('BudgetPanel — savings funds are not spending', () => {
+  const savingsFund = { id: 'f-save', name: 'Putovanje', amounts: Array(12).fill(20000), kind: 'savings' };
+
+  test('a savings fund with mapped categories is excluded', () => {
+    const { container } = renderPanel({
+      budget: { [YEAR]: { income: {}, funds: [savingsFund] } },
+      trackingMaps: { [YEAR]: { 'f-save': [CAT] } },
+    });
+    expect(container.firstChild).toBeNull();
+  });
+
+  test('a mixed year shows only the spending fund', () => {
+    renderPanel({
+      budget: {
+        [YEAR]: {
+          income: {},
+          funds: [
+            savingsFund,
+            { id: FUND_ID, name: 'Mesečni rashodi', amounts: Array(12).fill(50000) },
+          ],
+        },
+      },
+      trackingMaps: { [YEAR]: { 'f-save': [CAT], [FUND_ID]: [CAT] } },
+    });
+    expect(screen.getByText('Mesečni rashodi')).toBeInTheDocument();
+    expect(screen.queryByText('Putovanje')).not.toBeInTheDocument();
+  });
+});
+
 describe('BudgetPanel — fund rows', () => {
   const budget = {
     [YEAR]: {

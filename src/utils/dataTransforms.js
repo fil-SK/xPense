@@ -97,39 +97,85 @@ export function elapsedMonths(year, now = new Date()) {
   if (year > curYear) return 0;
   return now.getMonth() + 1;
 }
+// A fund is either a spending fund (compared against expenses in its mapped
+// categories) or a savings fund (money set aside, confirmed month by month).
+// The flag is absent on every fund written before it existed, so absent must
+// mean spending — the reading that leaves old data behaving exactly as it did.
+export const isSavingsFund = (fund) => fund?.kind === 'savings';
+
+// The zero progress a goal reports when it isn't linked to a fund that exists.
+// Exported so SavingsGoals doesn't hand-maintain a mirror of the shape below —
+// a missing key there renders as NaN rather than failing loudly.
+export const NO_PROGRESS = {
+  saved: 0, planned: 0, expected: 0,
+  pct: 0, plannedPct: 0, expectedPct: 0,
+  elapsed: 0, confirmedMonths: 0,
+};
+
 // Progress on a savings goal linked to a budget fund.
 //
-// A fund's twelve amounts are a *plan*, so summing all of them answers "how
-// much will this fund hold in December?" — not "how much is saved?". Filling in
-// the year made every goal read 100% on the 1st of January. Only the months
-// that have already happened count toward `saved`; the whole year stays
-// available as `planned` so the plan is shown rather than silently dropped.
+// A fund's twelve `amounts` are a *plan*. This used to count every elapsed
+// month as saved, which answered "how much was I intending to have set aside by
+// now?" and reported it as fact — the app assumed the money had been moved
+// because the user had written down that it would be.
 //
-// The current month counts as saved: that month's allocation is set aside
-// during it, and excluding it would park every goal at 0% for a month.
-// `null` months are "not set" and contribute nothing to either total.
+// `saved` is now what the user actually confirmed: the non-null entries in
+// `contributions`, written one month at a time from SavingsPanel. All of them
+// count, not just the elapsed ones — a confirmation exists because the user
+// asserted the money is set aside, so confirming ahead is real.
+//
+// The plan is not dropped, it is relabelled. `expected` is the old number (the
+// elapsed part of the plan) and `planned` the whole year, so the goal can show
+// the gap between what should have been set aside by now and what was.
+// `null` months are "not set" and contribute nothing to any total.
 export function goalProgress(fund, target, year, now = new Date()) {
   const amounts = fund?.amounts ?? [];
+  const contributions = fund?.contributions ?? [];
   const elapsed = elapsedMonths(year, now);
-  let saved = 0;
+
   let planned = 0;
+  let expected = 0;
   amounts.forEach((v, i) => {
     const amount = Number(v) || 0;
     planned += amount;
-    if (i < elapsed) saved += amount;
+    if (i < elapsed) expected += amount;
   });
+
+  // Counted separately from the sum: a confirmed zero is a real confirmation,
+  // and `saved === 0` alone can't tell it apart from never having confirmed.
+  let saved = 0;
+  let confirmedMonths = 0;
+  contributions.forEach((v) => {
+    if (v == null) return;
+    saved += Number(v) || 0;
+    confirmedMonths += 1;
+  });
+
   const toPct = (v) => (target > 0 ? Math.min(100, (v / target) * 100) : 0);
-  return { saved, planned, pct: toPct(saved), plannedPct: toPct(planned), elapsed };
+  return {
+    saved, planned, expected,
+    pct: toPct(saved), plannedPct: toPct(planned), expectedPct: toPct(expected),
+    elapsed, confirmedMonths,
+  };
 }
 
 export function applyBudgetCopy(data, fromYear, toYear) {
   const source = data.budget?.[fromYear];
   if (!source) return data;
   const fundIdMap = {};
+  // This field list is a deliberate whitelist, not a spread: structure copies
+  // to the new year, recorded values do not. `kind` is structure (a savings
+  // fund stays one); `contributions` are last year's record and must not follow
+  // the plan into next year. A new fund field is dropped unless added here.
   const newFunds = source.funds.map((f) => {
     const newId = crypto.randomUUID();
     fundIdMap[f.id] = newId;
-    return { id: newId, name: f.name, amounts: Array(12).fill(null) };
+    return {
+      id: newId,
+      name: f.name,
+      amounts: Array(12).fill(null),
+      ...(f.kind ? { kind: f.kind } : {}),
+    };
   });
   const sourceTracking = data.trackingMaps?.[fromYear] ?? {};
   const newTracking = Object.fromEntries(

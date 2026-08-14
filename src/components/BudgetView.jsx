@@ -15,7 +15,8 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useApp } from '../App.jsx';
 import { exportBudget, importBudget } from '../utils/storage.js';
-import { categoryColor } from '../utils/helpers.js';
+import { categoryColor, parseAmountInput } from '../utils/helpers.js';
+import { isSavingsFund } from '../utils/dataTransforms.js';
 
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun', 'Jul', 'Avg', 'Sep', 'Okt', 'Nov', 'Dec'];
 
@@ -45,11 +46,10 @@ function BudgetCell({ value, onSave }) {
   }
 
   function commit() {
-    const raw = draft.trim().replace(/\./g, '').replace(',', '.');
-    if (raw === '') { onSave(null); setEditing(false); return; }
-    const num = Number(raw);
-    if (isNaN(num) || num < 0) { setEditing(false); return; }
-    onSave(Math.round(num));
+    // `undefined` is unusable input — abandon the edit rather than write it.
+    // `null` is an emptied field, which clears the cell.
+    const parsed = parseAmountInput(draft);
+    if (parsed !== undefined) onSave(parsed);
     setEditing(false);
   }
 
@@ -84,6 +84,7 @@ function SortableFundRow({
   onSave, onDelete, onStartRename, onRename, onRenameCancel,
   editingFundId, editingFundName, setEditingFundName,
   expanded, onToggleExpand, categories, mapped, onToggleCat,
+  isSavings, onToggleSavings,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: fund.id });
@@ -95,10 +96,15 @@ function SortableFundRow({
   };
 
   const total = rowTotal(fund.amounts);
+  const contribs = fund.contributions ?? [];
 
   return (
     <>
-      <tr ref={setNodeRef} style={style} className="bg__row bg__row--fund">
+      <tr
+        ref={setNodeRef}
+        style={style}
+        className={`bg__row bg__row--fund ${isSavings ? 'bg__row--savings' : ''}`}
+      >
         <td className="bg__label-col bg__row-label bg__row-label--fund">
           <span
             className="bg__drag-handle"
@@ -132,12 +138,31 @@ function SortableFundRow({
           )}
 
           <button
-            className={`bg__cat-chip ${expanded ? 'bg__cat-chip--open' : ''}`}
-            onClick={onToggleExpand}
-            title={expanded ? 'Sakrij kategorije' : 'Kategorije troškova za ovaj fond'}
+            type="button"
+            className={`bg__cat-chip bg__save-chip ${isSavings ? 'bg__save-chip--on' : ''}`}
+            aria-pressed={isSavings}
+            aria-label={`Fond štednje: ${fund.name}`}
+            title={
+              isSavings
+                ? 'Fond štednje — odvajanja se potvrđuju u mesecu'
+                : 'Označi kao fond štednje'
+            }
+            onClick={() => onToggleSavings(fund.id, isSavings ? null : 'savings')}
           >
-            📂{mapped.length > 0 ? ` ${mapped.length}` : ''}
+            💰
           </button>
+
+          {/* Mapping spend categories to a savings fund would be a lie — its
+              money is set aside, never compared against expenses. */}
+          {!isSavings && (
+            <button
+              className={`bg__cat-chip ${expanded ? 'bg__cat-chip--open' : ''}`}
+              onClick={onToggleExpand}
+              title={expanded ? 'Sakrij kategorije' : 'Kategorije troškova za ovaj fond'}
+            >
+              📂{mapped.length > 0 ? ` ${mapped.length}` : ''}
+            </button>
+          )}
 
           {/* One click — the undo on the toast replaces the confirm. */}
           <button
@@ -151,7 +176,25 @@ function SortableFundRow({
         </td>
 
         {cols.map((m) => (
-          <td key={m} className={`bg__cell ${m === currentMonth ? 'bg__col--current' : ''}`}>
+          <td
+            key={m}
+            className={`bg__cell ${m === currentMonth ? 'bg__col--current' : ''} ${
+              isSavings ? 'bg__cell--savings' : ''
+            }`}
+          >
+            {/* Read-only adornment beside the cell, never in place of it — the
+                plan stays editable on a confirmed month. `!= null` is the test,
+                so a confirmed zero is marked and an unconfirmed month is not. */}
+            {isSavings && contribs[m] != null && (
+              <span
+                className="bg__confirm-mark"
+                role="img"
+                aria-label={`Odvojeno: ${fmt(contribs[m])} RSD`}
+                title={`Odvojeno u ${MONTHS_SHORT[m]}: ${fmt(contribs[m])} RSD`}
+              >
+                ✓
+              </span>
+            )}
             <BudgetCell
               value={fund.amounts[m]}
               onSave={(v) => onSave(fund.id, m, v)}
@@ -162,7 +205,7 @@ function SortableFundRow({
         <td className="bg__total-cell">{fmt(total)}</td>
       </tr>
 
-      {expanded && !isDragging && (
+      {expanded && !isSavings && !isDragging && (
         <tr className="bg__tracking-row">
           <td colSpan={14} className="bg__tracking-cell">
             <div className="bg__tracking-panel">
@@ -205,6 +248,7 @@ export default function BudgetView() {
     updateBudgetIncomeRow, addBudgetIncomeRow, removeBudgetIncomeRow, renameBudgetIncomeRow,
     removeBudgetFund, renameBudgetFund, reorderBudgetFunds,
     copyBudgetToYear, importBudgetData, showToast, updateTrackingMap,
+    setBudgetFundKind,
   } = useApp();
 
   const thisYear = new Date().getFullYear();
@@ -392,7 +436,7 @@ export default function BudgetView() {
         </label>
       </div>
       <div className="budget__hint" style={{ marginBottom: -4 }}>
-        Dvoklikom na naziv fonda ga preimenujete · 📂 za kategorije · Prevucite ⠿ za redosled
+        Dvoklikom na naziv fonda ga preimenujete · 💰 fond štednje · 📂 za kategorije · Prevucite ⠿ za redosled
       </div>
 
       <div className="budget__scroll">
@@ -527,6 +571,7 @@ export default function BudgetView() {
               <SortableContext items={fundIds} strategy={verticalListSortingStrategy}>
                 {yb.funds.map((fund) => {
                   const mapped = (data.trackingMaps?.[year] ?? {})[fund.id] ?? [];
+                  const isSavings = isSavingsFund(fund);
                   return (
                     <SortableFundRow
                       key={fund.id}
@@ -541,8 +586,16 @@ export default function BudgetView() {
                       editingFundId={editingFundId}
                       editingFundName={editingFundName}
                       setEditingFundName={setEditingFundName}
-                      expanded={expandedFundId === fund.id}
+                      expanded={expandedFundId === fund.id && !isSavings}
                       onToggleExpand={() => setExpandedFundId((id) => id === fund.id ? null : fund.id)}
+                      isSavings={isSavings}
+                      // Collapse here too: flipping 💰 with the panel open would
+                      // otherwise strand expandedFundId on a fund whose 📂 chip
+                      // is gone, leaving no way to close it again.
+                      onToggleSavings={(fundId, kind) => {
+                        setBudgetFundKind(year, fundId, kind);
+                        setExpandedFundId((id) => (id === fundId ? null : id));
+                      }}
                       categories={data.categories}
                       mapped={mapped}
                       onToggleCat={(cat) => {

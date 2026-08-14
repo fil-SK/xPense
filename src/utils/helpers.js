@@ -88,6 +88,22 @@ export function getTotalAmount(expenses) {
   return expenses.reduce((sum, e) => sum + Number(e.amount), 0);
 }
 
+// Parses an amount typed in Serbian formatting: '.' is the thousands separator
+// and ',' the decimal point, so '1.500,50' means 1500.5. Shared by the budget
+// grid cell and the savings panel — two copies would drift and then the same
+// keystrokes would mean different numbers in different places.
+//
+// Three outcomes, and the callers depend on all three being distinguishable:
+// `null` is a deliberate clear (the field was emptied), `undefined` is unusable
+// input the caller should abandon rather than save, and a number is a value.
+export function parseAmountInput(raw) {
+  const cleaned = String(raw ?? '').trim().replace(/\./g, '').replace(',', '.');
+  if (cleaned === '') return null;
+  const num = Number(cleaned);
+  if (isNaN(num) || num < 0) return undefined;
+  return Math.round(num);
+}
+
 export function getByCategory(expenses) {
   const map = {};
   expenses.forEach((e) => {

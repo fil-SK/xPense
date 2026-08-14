@@ -34,6 +34,22 @@ describe('withDefaults', () => {
     expect(filled.categories.length).toBeGreaterThan(0);
   });
 
+  // `budget` is passed through as an opaque object, which is what lets a fund
+  // carry the savings flag and its confirmations without touching this file.
+  test('a fund keeps its kind and contributions', () => {
+    const contributions = Array(12).fill(null);
+    contributions[1] = 15000;
+    const budget = {
+      2026: {
+        income: { plata: Array(12).fill(null), bonus: Array(12).fill(null), extra: [] },
+        funds: [{ id: 'f1', name: 'Putovanje', amounts: Array(12).fill(20000), kind: 'savings', contributions }],
+      },
+    };
+    const [fund] = withDefaults({ budget }).budget[2026].funds;
+    expect(fund.kind).toBe('savings');
+    expect(fund.contributions[1]).toBe(15000);
+  });
+
   test('keeps provided values', () => {
     const expenses = [{ id: '1', title: 'X', date: '2025-01-01', amount: 5, category: 'Hrana' }];
     expect(withDefaults({ expenses, categories: ['Hrana'] })).toMatchObject({

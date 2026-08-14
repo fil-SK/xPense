@@ -186,6 +186,22 @@ thead .bg__col--current { background: #e0e7ff !important; }
   vertical-align: middle;
 }
 
+/* Confirmed-savings mark. `.bgc` is a full-width block inside a right-aligned
+   cell, so the ✓ has to be lifted out of flow at the left edge — inline it
+   would push the number — and it must not eat the click that opens the editor.
+   The plan cell stays fully editable on a confirmed month. */
+.bg__cell--savings { position: relative; }
+.bg__confirm-mark {
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  line-height: 1;
+  color: var(--success);
+  pointer-events: none;
+}
+
 /* Inline budget cell */
 .bgc {
   display: block;
@@ -318,6 +334,15 @@ thead .bg__col--current { background: #e0e7ff !important; }
   background: var(--primary-light);
   border-color: var(--primary);
   color: var(--primary);
+}
+
+/* Savings toggle — same chip box as 📂 so the two read as a pair. */
+.bg__save-chip--on {
+  background: var(--success-light);
+  border-color: var(--success);
+}
+.bg__row--savings .bg__row-label--fund {
+  box-shadow: inset 2px 0 0 var(--success);
 }
 
 /* Inline tracking panel */

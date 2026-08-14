@@ -1,6 +1,6 @@
 import {
   generateRecurringExpenses, applyBudgetCopy, isEmptyData, applyExpenseDeletion,
-  elapsedMonths, goalProgress,
+  elapsedMonths, goalProgress, isSavingsFund, NO_PROGRESS,
 } from '../utils/dataTransforms.js';
 
 // ─── isEmptyData ──────────────────────────────────────────────────────────────
@@ -375,6 +375,31 @@ describe('applyBudgetCopy', () => {
     expect(copied.amounts).toEqual(Array(12).fill(null));
   });
 
+  // The field list in applyBudgetCopy is a whitelist: structure crosses into
+  // the new year, recorded values do not.
+  test('a savings fund stays a savings fund, without last year\'s confirmations', () => {
+    const contributions = Array(12).fill(null);
+    contributions[0] = 15000;
+    const withSavings = {
+      ...baseData,
+      budget: {
+        2025: {
+          ...baseData.budget[2025],
+          funds: [{ id: 'fund-s', name: 'Putovanje', amounts: Array(12).fill(20000), kind: 'savings', contributions }],
+        },
+      },
+    };
+    const [copied] = applyBudgetCopy(withSavings, 2025, 2026).budget[2026].funds;
+    expect(copied.kind).toBe('savings');
+    expect(copied.contributions).toBeUndefined();
+    expect(copied.amounts).toEqual(Array(12).fill(null));
+  });
+
+  test('a spending fund gains no kind key', () => {
+    const [copied] = applyBudgetCopy(baseData, 2025, 2026).budget[2026].funds;
+    expect('kind' in copied).toBe(false);
+  });
+
   test('remaps trackingMaps to new fund IDs preserving category lists', () => {
     const result = applyBudgetCopy(baseData, 2025, 2026);
     const newIds = result.budget[2026].funds.map((f) => f.id);
@@ -426,16 +451,65 @@ describe('elapsedMonths', () => {
   });
 });
 
+describe('isSavingsFund', () => {
+  test('only kind "savings" counts', () => {
+    expect(isSavingsFund({ kind: 'savings' })).toBe(true);
+    expect(isSavingsFund({ kind: 'spending' })).toBe(false);
+  });
+
+  // Every fund written before the flag existed lacks it, and those are spending
+  // funds — the reading that leaves old data behaving exactly as it did.
+  test('an absent kind means spending', () => {
+    expect(isSavingsFund({ id: 'f1', name: 'Hrana' })).toBe(false);
+  });
+
+  test('a missing fund is handled without throwing', () => {
+    expect(isSavingsFund(undefined)).toBe(false);
+    expect(isSavingsFund(null)).toBe(false);
+  });
+});
+
 describe('goalProgress', () => {
   const march = new Date('2026-03-15T12:00:00');
   const fullYear = { id: 'f1', name: 'Odmor', amounts: Array(12).fill(10000) };
+  const withContribs = (...months) => {
+    const contributions = Array(12).fill(null);
+    months.forEach(([i, v]) => { contributions[i] = v; });
+    return { ...fullYear, kind: 'savings', contributions };
+  };
 
-  // The bug this function exists to fix: the plan for the whole year used to be
-  // reported as money already saved.
-  test('only months up to and including the current one count as saved', () => {
-    const { saved, pct } = goalProgress(fullYear, 120000, 2026, march);
-    expect(saved).toBe(30000);
-    expect(pct).toBe(25);
+  // The bug this function exists to fix: the plan used to be reported as money
+  // already saved, on nothing but the user's word that they meant to save it.
+  test('saved is what was confirmed, not what was planned', () => {
+    const fund = withContribs([0, 10000], [1, 8000]);
+    const { saved, confirmedMonths, pct } = goalProgress(fund, 120000, 2026, march);
+    expect(saved).toBe(18000);
+    expect(confirmedMonths).toBe(2);
+    expect(pct).toBe(15);
+  });
+
+  test('a fully planned year with nothing confirmed reads as nothing saved', () => {
+    const { saved, pct, confirmedMonths, planned, expected } =
+      goalProgress(fullYear, 120000, 2026, march);
+    expect(saved).toBe(0);
+    expect(pct).toBe(0);
+    expect(confirmedMonths).toBe(0);
+    // The plan is relabelled, not dropped.
+    expect(planned).toBe(120000);
+    expect(expected).toBe(30000);
+  });
+
+  // What `saved` used to mean now lives on `expected`, and still answers "how
+  // much should have been set aside by now?".
+  test('expected counts months up to and including the current one', () => {
+    const { expected, expectedPct } = goalProgress(fullYear, 120000, 2026, march);
+    expect(expected).toBe(30000);
+    expect(expectedPct).toBe(25);
+  });
+
+  test('a past year is fully expected, a future year not at all', () => {
+    expect(goalProgress(fullYear, 120000, 2025, march).expected).toBe(120000);
+    expect(goalProgress(fullYear, 120000, 2027, march).expected).toBe(0);
   });
 
   test('the full year is still reported as planned', () => {
@@ -444,39 +518,56 @@ describe('goalProgress', () => {
     expect(plannedPct).toBe(100);
   });
 
-  test('a filled-in plan does not read as saved in January', () => {
-    const jan = new Date('2026-01-05T00:00:00');
-    expect(goalProgress(fullYear, 120000, 2026, jan).pct).toBeCloseTo(8.33, 1);
+  // A confirmation exists because the user asserted the money is set aside, so
+  // confirming ahead of the calendar is real rather than something to discount.
+  test('a confirmation in a future month still counts as saved', () => {
+    const fund = withContribs([11, 10000]);
+    expect(goalProgress(fund, 120000, 2026, march).saved).toBe(10000);
   });
 
-  test('a past year counts every month', () => {
-    expect(goalProgress(fullYear, 120000, 2025, march).saved).toBe(120000);
+  // `saved === 0` alone cannot tell these apart, which is why the count exists.
+  test('a confirmed zero is a confirmation, an unconfirmed month is not', () => {
+    const zero = goalProgress(withContribs([0, 0]), 120000, 2026, march);
+    expect(zero.saved).toBe(0);
+    expect(zero.confirmedMonths).toBe(1);
+    expect(goalProgress(fullYear, 120000, 2026, march).confirmedMonths).toBe(0);
   });
 
-  test('a future year has nothing saved but keeps its plan', () => {
-    const { saved, pct, planned } = goalProgress(fullYear, 120000, 2027, march);
-    expect(saved).toBe(0);
-    expect(pct).toBe(0);
-    expect(planned).toBe(120000);
-  });
-
-  test('null months are "not set" and add nothing to either total', () => {
-    const sparse = { amounts: [10000, null, 5000, null, null, null, null, null, null, null, null, null] };
-    const { saved, planned } = goalProgress(sparse, 100000, 2026, march);
-    expect(saved).toBe(15000);
+  test('null months add nothing to any total', () => {
+    const sparse = {
+      amounts: [10000, null, 5000, null, null, null, null, null, null, null, null, null],
+      contributions: [10000, null, null, null, null, null, null, null, null, null, null, null],
+    };
+    const { saved, planned, expected, confirmedMonths } = goalProgress(sparse, 100000, 2026, march);
+    expect(saved).toBe(10000);
+    expect(confirmedMonths).toBe(1);
     expect(planned).toBe(15000);
+    expect(expected).toBe(15000);
   });
 
-  test('progress is capped at 100% when the plan overshoots the target', () => {
-    expect(goalProgress(fullYear, 10000, 2025, march).pct).toBe(100);
+  test('progress is capped at 100% when it overshoots the target', () => {
+    const fund = withContribs([0, 50000]);
+    expect(goalProgress(fund, 10000, 2025, march).pct).toBe(100);
+    expect(goalProgress(fullYear, 10000, 2025, march).expectedPct).toBe(100);
   });
 
   test('a zero or missing target reports 0% rather than Infinity', () => {
-    expect(goalProgress(fullYear, 0, 2025, march).pct).toBe(0);
-    expect(goalProgress(fullYear, undefined, 2025, march).pct).toBe(0);
+    const fund = withContribs([0, 10000]);
+    expect(goalProgress(fund, 0, 2025, march).pct).toBe(0);
+    expect(goalProgress(fund, undefined, 2025, march).pct).toBe(0);
+    expect(goalProgress(fund, 0, 2025, march).expectedPct).toBe(0);
   });
 
   test('a missing fund is handled without throwing', () => {
-    expect(goalProgress(undefined, 50000, 2026, march)).toMatchObject({ saved: 0, planned: 0, pct: 0 });
+    expect(goalProgress(undefined, 50000, 2026, march)).toMatchObject({
+      saved: 0, planned: 0, expected: 0, pct: 0, confirmedMonths: 0,
+    });
+  });
+
+  test('NO_PROGRESS carries every key goalProgress returns', () => {
+    // SavingsGoals renders straight off these keys, so a missing one prints
+    // NaN rather than failing loudly.
+    const keys = Object.keys(goalProgress(fullYear, 100, 2026, march)).sort();
+    expect(Object.keys(NO_PROGRESS).sort()).toEqual(keys);
   });
 });

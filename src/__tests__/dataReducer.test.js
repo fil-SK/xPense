@@ -69,6 +69,8 @@ describe('dataReducer routing', () => {
     run(data, 'expense/add', { id: 'x', title: 'X', date: '2025-02-01', amount: 1, category: 'Hrana' });
     run(data, 'category/delete', { name: 'Hrana' });
     run(data, 'budget/removeFund', { year: 2025, fundId: 'f1' });
+    run(data, 'budget/setFundKind', { year: 2025, fundId: 'f1', kind: 'savings' });
+    run(data, 'budget/setFundContribution', { year: 2025, fundId: 'f1', monthIdx: 0, value: 500 });
     run(data, 'data/restore', { snapshot: baseData(), keys: ['expenses'] });
     expect(data).toEqual(snapshot);
   });
@@ -316,6 +318,61 @@ describe('budget slice', () => {
     const result = run(baseData(), 'budget/setFundAmount', { year: 2025, fundId: 'f2', monthIdx: 0, value: 5000 });
     expect(result.budget[2025].funds[1].amounts[0]).toBe(5000);
     expect(result.budget[2025].funds[0].amounts[0]).toBeNull();
+  });
+
+  test('budget/setFundKind marks one fund and leaves its siblings alone', () => {
+    const result = run(baseData(), 'budget/setFundKind', { year: 2025, fundId: 'f1', kind: 'savings' });
+    expect(result.budget[2025].funds[0].kind).toBe('savings');
+    expect('kind' in result.budget[2025].funds[1]).toBe(false);
+  });
+
+  // Dropped rather than set to null, so a spending fund stays byte-identical to
+  // one that was never toggled and "absent means spending" holds literally.
+  test('budget/setFundKind removes the key when switched back', () => {
+    const savings = run(baseData(), 'budget/setFundKind', { year: 2025, fundId: 'f1', kind: 'savings' });
+    const back = run(savings, 'budget/setFundKind', { year: 2025, fundId: 'f1', kind: null });
+    expect('kind' in back.budget[2025].funds[0]).toBe(false);
+  });
+
+  test('budget/setFundKind leaves the amounts and any contributions intact', () => {
+    const data = baseData();
+    data.budget[2025].funds[0].amounts[0] = 9000;
+    data.budget[2025].funds[0].contributions = Array(12).fill(null);
+    data.budget[2025].funds[0].contributions[0] = 7000;
+    const result = run(data, 'budget/setFundKind', { year: 2025, fundId: 'f1', kind: 'savings' });
+    expect(result.budget[2025].funds[0].amounts[0]).toBe(9000);
+    expect(result.budget[2025].funds[0].contributions[0]).toBe(7000);
+  });
+
+  test('budget/setFundKind on a year that does not exist yet does not throw', () => {
+    expect(() => run(baseData(), 'budget/setFundKind', { year: 2030, fundId: 'f1', kind: 'savings' }))
+      .not.toThrow();
+  });
+
+  // The array is absent until the first confirmation, so it has to be minted.
+  test('budget/setFundContribution creates the twelve slots on a fund with none', () => {
+    const result = run(baseData(), 'budget/setFundContribution', { year: 2025, fundId: 'f1', monthIdx: 2, value: 20000 });
+    const fund = result.budget[2025].funds[0];
+    expect(fund.contributions).toHaveLength(12);
+    expect(fund.contributions[2]).toBe(20000);
+    expect(fund.contributions[1]).toBeNull();
+    expect(fund.amounts).toEqual(Array(12).fill(null));
+    expect(result.budget[2025].funds[1].contributions).toBeUndefined();
+  });
+
+  test('budget/setFundContribution with null un-confirms just that month', () => {
+    const one = run(baseData(), 'budget/setFundContribution', { year: 2025, fundId: 'f1', monthIdx: 0, value: 100 });
+    const two = run(one, 'budget/setFundContribution', { year: 2025, fundId: 'f1', monthIdx: 1, value: 200 });
+    const cleared = run(two, 'budget/setFundContribution', { year: 2025, fundId: 'f1', monthIdx: 0, value: null });
+    expect(cleared.budget[2025].funds[0].contributions[0]).toBeNull();
+    expect(cleared.budget[2025].funds[0].contributions[1]).toBe(200);
+  });
+
+  // "I set aside nothing this month" is an answer the plan can't express, so it
+  // has to survive as distinct from never having been asked.
+  test('budget/setFundContribution stores a confirmed zero as zero, not null', () => {
+    const result = run(baseData(), 'budget/setFundContribution', { year: 2025, fundId: 'f1', monthIdx: 0, value: 0 });
+    expect(result.budget[2025].funds[0].contributions[0]).toBe(0);
   });
 
   test('budget/addFund appends to the year', () => {

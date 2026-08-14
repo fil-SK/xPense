@@ -2,8 +2,40 @@ import {
   formatAmount, formatDate, todayISO,
   getExpensesForMonth, getTotalAmount, getByCategory, getAvailableMonths,
   lastDayOfMonth, isoDate, clampISODate, categoryColor, CHART_COLORS, monthKey,
-  filterByCategories,
+  filterByCategories, parseAmountInput,
 } from '../utils/helpers.js';
+
+// Shared by the budget grid cell and the savings panel, so the same keystrokes
+// have to mean the same number in both.
+describe('parseAmountInput', () => {
+  test("'.' is a thousands separator, ',' the decimal point", () => {
+    expect(parseAmountInput('1.500')).toBe(1500);
+    expect(parseAmountInput('1500,50')).toBe(1501);
+    expect(parseAmountInput('1.500,49')).toBe(1500);
+  });
+
+  // The three outcomes have to stay distinguishable: an emptied field clears
+  // the value, garbage abandons the edit, and zero is a real answer.
+  test('an empty field is a deliberate clear, not garbage', () => {
+    expect(parseAmountInput('')).toBeNull();
+    expect(parseAmountInput('   ')).toBeNull();
+    expect(parseAmountInput(undefined)).toBeNull();
+  });
+
+  test('unusable input is undefined so the caller can abandon the edit', () => {
+    expect(parseAmountInput('abc')).toBeUndefined();
+    expect(parseAmountInput('-5')).toBeUndefined();
+  });
+
+  test('zero parses as zero', () => {
+    expect(parseAmountInput('0')).toBe(0);
+  });
+
+  test('plain integers pass through rounded', () => {
+    expect(parseAmountInput('20000')).toBe(20000);
+    expect(parseAmountInput(' 42 ')).toBe(42);
+  });
+});
 
 describe('filterByCategories', () => {
   const expenses = [

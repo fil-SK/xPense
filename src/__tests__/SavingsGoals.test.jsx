@@ -127,17 +127,29 @@ describe('SavingsGoals — goal display', () => {
   });
 });
 
-// Progress is "saved so far", not "planned for the year" — a fund's twelve
-// amounts are a plan, and summing all of them used to report a goal as fully
-// saved on the 1st of January.
-describe('SavingsGoals — progress measures elapsed months', () => {
+// Progress is what the user confirmed setting aside, not what the year plans to
+// set aside. Summing the plan used to report a goal as fully saved on the 1st of
+// January, on nothing but the user's word that they meant to save it.
+describe('SavingsGoals — progress measures confirmed savings', () => {
   const CUR_FUND = 'fund-2026';
-  const PLANNED_YEAR = {
+  const plannedYear = (contributions) => ({
     2026: {
       income: { plata: Array(12).fill(null), bonus: Array(12).fill(null) },
-      funds: [{ id: CUR_FUND, name: 'Letovanje', amounts: Array(12).fill(10000) }],
+      funds: [{
+        id: CUR_FUND,
+        name: 'Letovanje',
+        amounts: Array(12).fill(10000),
+        kind: 'savings',
+        ...(contributions ? { contributions } : {}),
+      }],
     },
+  });
+  const confirmed = (...months) => {
+    const arr = Array(12).fill(null);
+    months.forEach(([i, v]) => { arr[i] = v; });
+    return arr;
   };
+  const PLANNED_YEAR = plannedYear();
   const goal = { id: 'g3', name: 'Letovanje', target: 120000, fundId: CUR_FUND, year: 2026 };
 
   beforeEach(() => {
@@ -148,16 +160,27 @@ describe('SavingsGoals — progress measures elapsed months', () => {
     vi.useRealTimers();
   });
 
-  test('counts only the months that have already happened', () => {
-    renderGoals({ savingsGoals: [goal], budget: PLANNED_YEAR });
-    // Jan–Mar of 12 × 10.000 = 30.000 of a 120.000 target.
-    expect(screen.getByText(/Ušteđeno: 30\.000 RSD \/ 120\.000 RSD \(25%\)/)).toBeInTheDocument();
+  test('the saved line is the sum of the confirmed months', () => {
+    const budget = plannedYear(confirmed([0, 10000], [1, 8000]));
+    renderGoals({ savingsGoals: [goal], budget });
+    expect(screen.getByText(/Ušteđeno: 18\.000 RSD \/ 120\.000 RSD \(15%\)/)).toBeInTheDocument();
   });
 
-  test('a fully filled-in plan does not read as 100% saved in March', () => {
+  test('a filled-in plan with nothing confirmed reads as nothing saved', () => {
     renderGoals({ savingsGoals: [goal], budget: PLANNED_YEAR });
-    // The plan line is allowed to say 100% — the saved line is not.
-    expect(screen.queryByText(/Ušteđeno:.*100%/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Ušteđeno: 0 RSD \/ 120\.000 RSD \(0%\)/)).toBeInTheDocument();
+  });
+
+  // What the bar used to show is now a line of its own, labelled as the plan.
+  test('the elapsed plan is shown as "Očekivano do sada"', () => {
+    renderGoals({ savingsGoals: [goal], budget: PLANNED_YEAR });
+    expect(screen.getByText(/Očekivano do sada: 30\.000 RSD \(25%\)/)).toBeInTheDocument();
+  });
+
+  test('"Očekivano do sada" is hidden when the confirmations match the plan', () => {
+    const budget = plannedYear(confirmed([0, 10000], [1, 10000], [2, 10000]));
+    renderGoals({ savingsGoals: [goal], budget });
+    expect(screen.queryByText(/očekivano do sada/i)).not.toBeInTheDocument();
   });
 
   test('the rest of the year is still shown, labelled as a plan', () => {
@@ -165,16 +188,41 @@ describe('SavingsGoals — progress measures elapsed months', () => {
     expect(screen.getByText(/Po planu do kraja 2026: 120\.000 RSD \(100%\)/)).toBeInTheDocument();
   });
 
-  test('a past year counts every month, so the plan line is dropped', () => {
+  test('a past year is fully elapsed, so the plan line is dropped', () => {
     renderGoals({ savingsGoals: [{ ...goal, fundId: FUND_ID, year: 2025 }], budget: BUDGET });
     expect(screen.queryByText(/po planu do kraja/i)).not.toBeInTheDocument();
   });
 
-  test('the bar is a progressbar reporting the saved amount', () => {
-    renderGoals({ savingsGoals: [goal], budget: PLANNED_YEAR });
+  test('the bar is a progressbar reporting the confirmed amount', () => {
+    const budget = plannedYear(confirmed([0, 10000], [1, 8000]));
+    renderGoals({ savingsGoals: [goal], budget });
     const bar = screen.getByRole('progressbar', { name: /napredak: letovanje/i });
-    expect(bar).toHaveAttribute('aria-valuenow', '25');
-    expect(bar).toHaveAttribute('aria-valuetext', expect.stringContaining('Ušteđeno 30.000 RSD'));
+    expect(bar).toHaveAttribute('aria-valuenow', '15');
+    expect(bar).toHaveAttribute('aria-valuetext', expect.stringContaining('Ušteđeno 18.000 RSD'));
+  });
+
+  // A 0% bar on a funded goal looks like a bug unless it says what is missing,
+  // and the missing step differs by whether the fund is flagged at all.
+  test('a savings fund with nothing confirmed points at the month view', () => {
+    renderGoals({ savingsGoals: [goal], budget: PLANNED_YEAR });
+    expect(screen.getByText(/nema potvrđenih odvajanja/i)).toBeInTheDocument();
+  });
+
+  test('a fund that is not flagged as savings points at the 💰 toggle', () => {
+    const budget = {
+      2026: {
+        income: { plata: Array(12).fill(null), bonus: Array(12).fill(null) },
+        funds: [{ id: CUR_FUND, name: 'Letovanje', amounts: Array(12).fill(10000) }],
+      },
+    };
+    renderGoals({ savingsGoals: [goal], budget });
+    expect(screen.getByText(/nije označen kao fond štednje/i)).toBeInTheDocument();
+  });
+
+  test('the explain line is gone once a month is confirmed', () => {
+    const budget = plannedYear(confirmed([0, 10000]));
+    renderGoals({ savingsGoals: [goal], budget });
+    expect(screen.queryByText(/nema potvrđenih odvajanja/i)).not.toBeInTheDocument();
   });
 
   test('an unlinked goal says why it sits at 0%', () => {

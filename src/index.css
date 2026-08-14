@@ -42,6 +42,7 @@
      charts.css              Charts.jsx
      budget-view.css         BudgetView.jsx + .bg grid
      budget-panel.css        BudgetPanel.jsx
+     savings-panel.css       SavingsPanel.jsx
      global-search.css       GlobalSearch.jsx
      savings-goals.css       SavingsGoals.jsx
    Overrides (order-critical — keep last)
@@ -75,6 +76,7 @@
 @import './styles/charts.css';
 @import './styles/budget-view.css';
 @import './styles/budget-panel.css';
+@import './styles/savings-panel.css';
 @import './styles/global-search.css';
 @import './styles/savings-goals.css';
 

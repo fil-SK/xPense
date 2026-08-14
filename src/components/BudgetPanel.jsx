@@ -1,5 +1,6 @@
 import { useApp } from '../App.jsx';
 import { getExpensesForMonth, getTotalAmount } from '../utils/helpers.js';
+import { isSavingsFund } from '../utils/dataTransforms.js';
 
 const THRESHOLD_WARN = 0.9;
 
@@ -20,8 +21,11 @@ export default function BudgetPanel({ year, month }) {
   const funds = data.budget?.[year]?.funds ?? [];
   const yearMaps = data.trackingMaps?.[year] ?? {};
 
+  // A savings fund is never compared against expenses — its money is set aside,
+  // not spent, so any mapped categories it still carries from before it was
+  // flagged would measure it against spending that has nothing to do with it.
   const trackedFunds = funds.filter(
-    (f) => (yearMaps[f.id] ?? []).length > 0
+    (f) => !isSavingsFund(f) && (yearMaps[f.id] ?? []).length > 0
   );
 
   if (trackedFunds.length === 0) return null;

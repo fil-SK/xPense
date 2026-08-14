@@ -84,4 +84,34 @@ describe('App actions through the real context', () => {
 
     await waitFor(() => expect(stored().categories).toContain('Putovanja'));
   });
+
+  // The 💰 flag and the confirmations live inside `budget`, so this also pins
+  // that they survive the trip through localStorage.
+  test('flagging a fund as savings and confirming a month persists both', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await waitFor(() => expect(localStorage.getItem(KEY)).not.toBeNull());
+    const year = new Date().getFullYear();
+
+    await user.click(screen.getByRole('button', { name: /budžet/i }));
+    await user.type(screen.getByPlaceholderText(/dodaj fond ili kategoriju/i), 'Putovanje{Enter}');
+    await waitFor(() => expect(stored().budget[year].funds).toHaveLength(1));
+
+    await user.click(screen.getByRole('button', { name: 'Fond štednje: Putovanje' }));
+    await waitFor(() => expect(stored().budget[year].funds[0].kind).toBe('savings'));
+
+    // Back to the month, where confirmations are actually made.
+    await user.click(screen.getByRole('button', { name: /početna/i }));
+    await user.click(screen.getByRole('button', { name: /prethodne/i }));
+    const monthCard = screen.getAllByRole('button', { name: /januar/i })[0];
+    await user.click(monthCard);
+
+    const input = screen.getByLabelText(/odvojeno za putovanje/i);
+    await user.type(input, '12000');
+    await user.click(screen.getByRole('button', { name: /potvrdi odvajanje: putovanje/i }));
+
+    await waitFor(() =>
+      expect(stored().budget[year].funds[0].contributions[0]).toBe(12000)
+    );
+  });
 });

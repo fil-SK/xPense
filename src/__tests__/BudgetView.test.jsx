@@ -27,6 +27,8 @@ function renderBudgetView(dataOverrides = {}) {
   const removeBudgetIncomeRow = vi.fn();
   const renameBudgetIncomeRow = vi.fn();
   const updateBudgetIncomeRow = vi.fn();
+  const updateBudgetFund = vi.fn();
+  const setBudgetFundKind = vi.fn();
   const ctx = {
     data: {
       expenses: [],
@@ -39,7 +41,8 @@ function renderBudgetView(dataOverrides = {}) {
       ...dataOverrides,
     },
     updateBudgetIncome: vi.fn(),
-    updateBudgetFund: vi.fn(),
+    updateBudgetFund,
+    setBudgetFundKind,
     addBudgetFund: vi.fn(),
     removeBudgetFund: vi.fn(),
     renameBudgetFund: vi.fn(),
@@ -64,6 +67,8 @@ function renderBudgetView(dataOverrides = {}) {
     removeBudgetIncomeRow,
     renameBudgetIncomeRow,
     updateBudgetIncomeRow,
+    updateBudgetFund,
+    setBudgetFundKind,
   };
 }
 
@@ -83,6 +88,94 @@ describe('BudgetView — category chip', () => {
   test('chip shows no count when no categories are linked', () => {
     renderBudgetView();
     expect(screen.getByRole('button', { name: '📂' })).toBeInTheDocument();
+  });
+});
+
+describe('BudgetView — savings toggle', () => {
+  const SAVINGS_FUND = { ...FUND_2, name: 'Putovanje', kind: 'savings' };
+
+  test('every fund row carries a 💰 chip named after its fund', () => {
+    renderBudgetView({ budget: makeBudget([BASE_FUND, FUND_2]) });
+    expect(screen.getByRole('button', { name: 'Fond štednje: Mesečni rashodi' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fond štednje: Štednja' })).toBeInTheDocument();
+  });
+
+  test('the chip reports whether the fund is a savings fund', () => {
+    renderBudgetView({ budget: makeBudget([BASE_FUND, SAVINGS_FUND]) });
+    expect(screen.getByRole('button', { name: 'Fond štednje: Mesečni rashodi' }))
+      .toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Fond štednje: Putovanje' }))
+      .toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('clicking marks a spending fund as savings', async () => {
+    const user = userEvent.setup();
+    const { setBudgetFundKind } = renderBudgetView();
+    await user.click(screen.getByRole('button', { name: 'Fond štednje: Mesečni rashodi' }));
+    expect(setBudgetFundKind).toHaveBeenCalledWith(YEAR, FUND_ID, 'savings');
+  });
+
+  test('clicking an already-savings fund switches it back', async () => {
+    const user = userEvent.setup();
+    const { setBudgetFundKind } = renderBudgetView({ budget: makeBudget([SAVINGS_FUND]) });
+    await user.click(screen.getByRole('button', { name: 'Fond štednje: Putovanje' }));
+    expect(setBudgetFundKind).toHaveBeenCalledWith(YEAR, FUND_ID_2, null);
+  });
+
+  // A savings fund is never compared against expenses, so offering it a
+  // category mapping would be a lie.
+  test('a savings fund gets no 📂 chip and no tracking panel', () => {
+    renderBudgetView({ budget: makeBudget([SAVINGS_FUND]) });
+    expect(screen.queryByTitle('Kategorije troškova za ovaj fond')).not.toBeInTheDocument();
+  });
+
+  test('a mixed year still offers the 📂 chip on the spending fund', () => {
+    renderBudgetView({ budget: makeBudget([BASE_FUND, SAVINGS_FUND]) });
+    expect(screen.getAllByTitle('Kategorije troškova za ovaj fond')).toHaveLength(1);
+  });
+});
+
+describe('BudgetView — confirmed savings in the grid', () => {
+  const confirmedFund = (month, value) => {
+    const contributions = Array(12).fill(null);
+    contributions[month] = value;
+    return { ...BASE_FUND, name: 'Putovanje', kind: 'savings', contributions };
+  };
+
+  test('a confirmed month is marked, and says how much was set aside', () => {
+    renderBudgetView({ budget: makeBudget([confirmedFund(1, 15000)]) });
+    expect(screen.getByRole('img', { name: 'Odvojeno: 15.000 RSD' })).toBeInTheDocument();
+  });
+
+  test('only the confirmed months are marked', () => {
+    renderBudgetView({ budget: makeBudget([confirmedFund(1, 15000)]) });
+    expect(screen.getAllByRole('img', { name: /odvojeno:/i })).toHaveLength(1);
+  });
+
+  // A confirmed zero is a confirmation; an unconfirmed month is not.
+  test('a confirmed zero is marked too', () => {
+    renderBudgetView({ budget: makeBudget([confirmedFund(1, 0)]) });
+    expect(screen.getByRole('img', { name: 'Odvojeno: 0 RSD' })).toBeInTheDocument();
+  });
+
+  test('a spending fund is never marked', () => {
+    const withContribs = { ...BASE_FUND, contributions: Array(12).fill(5000) };
+    renderBudgetView({ budget: makeBudget([withContribs]) });
+    expect(screen.queryByRole('img', { name: /odvojeno:/i })).not.toBeInTheDocument();
+  });
+
+  // The ✓ is an adornment, not a replacement — the plan behind it is still the
+  // editable cell it always was.
+  test('the plan cell stays editable on a confirmed month', async () => {
+    const user = userEvent.setup();
+    const { updateBudgetFund } = renderBudgetView({ budget: makeBudget([confirmedFund(1, 15000)]) });
+    // The February cell — the one carrying the ✓.
+    const febCell = document.querySelectorAll('.bg__row--savings .bg__cell .bgc')[1];
+    await user.click(febCell);
+    const input = document.querySelector('.bgc-input');
+    expect(input).not.toBeNull();
+    await user.type(input, '25000{Enter}');
+    expect(updateBudgetFund).toHaveBeenCalledWith(YEAR, FUND_ID, 1, 25000);
   });
 });
 
