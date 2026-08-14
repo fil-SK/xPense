@@ -1,0 +1,132 @@
+/* Component: components/LiveOverview.jsx — the plan-vs-actual year grid.
+
+   It reuses budget-view.css wholesale: .budget page chrome, .budget__summary
+   cards and the whole .bg table (sticky label column, month heads, subtotal
+   and balance rows). Only what is genuinely new lives here — the two-line
+   cell, the directional status colours, and the month-header buttons.
+
+   Colours are var(--…) only, so dark.css needs no counterpart rules. */
+
+/* ── Head ────────────────────────────────────────────────────────────────── */
+.lgo__year-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lgo__year {
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 56px;
+  text-align: center;
+}
+
+.lgo__summary-delta {
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+
+/* Directional, not a single red/green scale: 'behind' is over plan on a
+   spending row and under plan on a savings row, and both are the bad case. */
+.lgo__summary-delta--ahead,
+.lgo-dot--ahead { color: var(--success); }
+.lgo__summary-delta--behind,
+.lgo-dot--behind { color: var(--danger); }
+.lgo__summary-delta--onTrack,
+.lgo-dot--onTrack { color: var(--text-muted); }
+
+.budget__summary-dot.lgo-dot--ahead { background: var(--success); }
+.budget__summary-dot.lgo-dot--behind { background: var(--danger); }
+.budget__summary-dot.lgo-dot--onTrack { background: var(--primary); }
+.budget__summary-dot.lgo-dot--unset { background: var(--border); }
+
+/* ── Grid ────────────────────────────────────────────────────────────────── */
+.lgo__month-btn {
+  background: none;
+  border: 0;
+  padding: 2px 4px;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.lgo__month-btn:hover { color: var(--primary); background: var(--primary-light); }
+.lgo__month-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+.lgo__row-label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.lgo__row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lgo__row-hint {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.lgo__row--unmapped .lgo__row-name { font-style: italic; color: var(--text-muted); }
+
+/* Two lines per cell: what happened, over what was planned. */
+.lgo-cell,
+.lgo-total {
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.lgo-cell__actual {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.lgo-cell__plan {
+  display: block;
+  min-height: 13px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.lgo-cell--ahead .lgo-cell__actual,
+.lgo-total--ahead .lgo-cell__actual { color: var(--success); }
+.lgo-cell--behind .lgo-cell__actual,
+.lgo-total--behind .lgo-cell__actual { color: var(--danger); }
+/* A spending row under plan is unremarkable, so it keeps the default colour —
+   the vacation may simply not have been taken yet. */
+.lgo-cell--onTrack .lgo-cell__actual,
+.lgo-total--onTrack .lgo-cell__actual { color: var(--text); }
+
+/* A month that hasn't happened shows its plan and nothing else. */
+.lgo-cell--future { opacity: .45; }
+.lgo-cell--future .lgo-cell__actual { color: var(--text-muted); font-weight: 500; }
+
+/* The one editable thing on the page. It sits inside the same cell shell, so
+   the override and the inherited plan value line up exactly. */
+.lgo-cell__edit {
+  text-align: right;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+}
+.lgo-cell__edit:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.bg__row .lgo-cell__edit.bgc--filled { box-shadow: inset 2px 0 0 var(--primary); }
+
+.lgo__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  max-width: 620px;
+  padding: 32px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}

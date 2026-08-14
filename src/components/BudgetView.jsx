@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -15,68 +15,16 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useApp } from '../App.jsx';
 import { exportBudget, importBudget } from '../utils/storage.js';
-import { categoryColor, parseAmountInput } from '../utils/helpers.js';
+import { categoryColor } from '../utils/helpers.js';
 import { isSavingsFund } from '../utils/dataTransforms.js';
+import BudgetCell, { fmt } from './BudgetCell.jsx';
 
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun', 'Jul', 'Avg', 'Sep', 'Okt', 'Nov', 'Dec'];
-
-function fmt(val) {
-  if (val == null) return '—';
-  return val.toLocaleString('sr-RS');
-}
 
 function rowTotal(arr) {
   const hasAny = arr.some((v) => v != null);
   if (!hasAny) return null;
   return arr.reduce((s, v) => s + (v ?? 0), 0);
-}
-
-function BudgetCell({ value, onSave }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState('');
-  const inputRef = useRef(null);
-
-  useEffect(() => {
-    if (editing && inputRef.current) inputRef.current.focus();
-  }, [editing]);
-
-  function startEdit() {
-    setDraft(value != null ? String(value) : '');
-    setEditing(true);
-  }
-
-  function commit() {
-    // `undefined` is unusable input — abandon the edit rather than write it.
-    // `null` is an emptied field, which clears the cell.
-    const parsed = parseAmountInput(draft);
-    if (parsed !== undefined) onSave(parsed);
-    setEditing(false);
-  }
-
-  if (editing) {
-    return (
-      <input
-        ref={inputRef}
-        className="bgc-input"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') commit();
-          if (e.key === 'Escape') setEditing(false);
-        }}
-      />
-    );
-  }
-
-  return (
-    <span
-      className={`bgc ${value != null ? 'bgc--filled' : 'bgc--empty'}`}
-      onClick={startEdit}
-    >
-      {fmt(value)}
-    </span>
-  );
 }
 
 function SortableFundRow({

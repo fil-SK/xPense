@@ -29,6 +29,13 @@ function IconWallet() {
     </svg>
   );
 }
+function IconPulse() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12h4l2.5-6 4 13L16 12h5" />
+    </svg>
+  );
+}
 function IconTag() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -91,6 +98,14 @@ export default function Header() {
         >
           <IconWallet />
           <span>Budžet</span>
+        </button>
+        <button
+          className={`header__btn ${view === 'overview' ? 'header__btn--active' : ''}`}
+          onClick={() => navigateTo('overview')}
+          title="Plan iz budžeta naspram stvarnog stanja"
+        >
+          <IconPulse />
+          <span>Live pregled</span>
         </button>
         <button
           className={`header__btn ${view === 'categories' ? 'header__btn--active' : ''}`}

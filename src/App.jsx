@@ -15,6 +15,7 @@ import MonthView from './components/MonthView.jsx';
 import PreviousSpendings from './components/PreviousSpendings.jsx';
 import CategoryManager from './components/CategoryManager.jsx';
 import BudgetView from './components/BudgetView.jsx';
+import LiveOverview from './components/LiveOverview.jsx';
 import GlobalSearch from './components/GlobalSearch.jsx';
 
 export const AppContext = createContext(null);
@@ -410,6 +411,12 @@ export default function App() {
       dispatch({ type: 'budget/copyToYear', payload: { fromYear, toYear } }),
     updateTrackingMap: (year, fundId, categories) =>
       dispatch({ type: 'tracking/set', payload: { year, fundId, categories } }),
+    // Silent for the same reason as setBudgetFundKind — the cell visibly picks
+    // up the typed number, and a toast would take away an undo raised elsewhere
+    // in the same grid. `null` reverts the month to the budgeted figure, which
+    // is a restore rather than a delete, so it needs no undo of its own.
+    setActualIncome: (year, rowKey, monthIdx, value) =>
+      dispatch({ type: 'actualIncome/set', payload: { year, rowKey, monthIdx, value } }),
 
     addSavingsGoal: (goal) => {
       dispatch({ type: 'goal/add', payload: { ...goal, id: newId() } });
@@ -496,6 +503,7 @@ export default function App() {
           )}
           {view === 'categories' && <CategoryManager />}
           {view === 'budget' && <BudgetView />}
+          {view === 'overview' && <LiveOverview />}
           {view === 'search' && <GlobalSearch />}
         </main>
 

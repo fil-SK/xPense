@@ -41,6 +41,7 @@
      import-confirm.css      ImportConfirmModal.jsx
      charts.css              Charts.jsx
      budget-view.css         BudgetView.jsx + .bg grid
+     live-overview.css       LiveOverview.jsx (extends the .bg grid)
      budget-panel.css        BudgetPanel.jsx
      savings-panel.css       SavingsPanel.jsx
      global-search.css       GlobalSearch.jsx
@@ -75,6 +76,7 @@
 @import './styles/import-confirm.css';
 @import './styles/charts.css';
 @import './styles/budget-view.css';
+@import './styles/live-overview.css';
 @import './styles/budget-panel.css';
 @import './styles/savings-panel.css';
 @import './styles/global-search.css';

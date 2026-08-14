@@ -2,6 +2,103 @@
 
 import { isoDate, monthKey } from './helpers.js';
 
+// How close to the allocation counts as "nearly there" rather than fine.
+export const THRESHOLD_WARN = 0.9;
+
+// spent / allocated → a status name. `null` means the month has no allocation
+// at all, which is different from having one and spending nothing against it.
+// Lives here rather than in BudgetPanel because the yearly overview grades the
+// same ratio and two copies would drift into disagreeing about the same month.
+export function statusKey(ratio) {
+  if (ratio === null) return 'unset';
+  if (ratio > 1) return 'over';
+  if (ratio >= THRESHOLD_WARN) return 'warn';
+  return 'ok';
+}
+
+// Is this row doing better or worse than its plan?
+//
+// The direction is the whole point. Spending less than planned on Hrana is not
+// an achievement — the money may simply not have been spent *yet* — so a
+// spending row under plan reports 'onTrack', never 'ahead'. Setting aside less
+// than planned for Putovanje is a real shortfall, so a savings row under plan
+// reports 'behind'. One shared red/green scale would call the second case good.
+//
+// `higherIsBetter` is true for income and savings rows, false for spending.
+export function varianceStatus(actual, planned, { higherIsBetter } = {}) {
+  if (actual == null || planned == null) return 'unset';
+  if (actual === planned) return 'onTrack';
+  const above = actual > planned;
+  if (higherIsBetter) return above ? 'ahead' : 'behind';
+  // Under plan on a spending row is unremarkable, not a win.
+  return above ? 'behind' : 'onTrack';
+}
+
+// Buckets a year's expenses into per-month category totals in a single pass.
+//
+// The overview grid asks "what was spent on these categories in this month?"
+// once per fund per month. Answering that with getExpensesForMonth would walk
+// the whole expense array 12 × funds times; this walks it once and every later
+// question is an object lookup.
+//
+// Month is read off the 'YYYY-MM-DD' string rather than parsed, for the reason
+// getExpensesForMonth documents: '2026-02-31' belongs to the month it names.
+export function monthlyCategoryTotals(expenses, year) {
+  const byMonth = Array.from({ length: 12 }, () => ({}));
+  const monthTotals = Array(12).fill(0);
+  const prefix = `${year}-`;
+  for (const e of expenses ?? []) {
+    if (!e.date?.startsWith(prefix)) continue;
+    const m = Number(e.date.slice(5, 7)) - 1;
+    if (!(m >= 0 && m <= 11)) continue;
+    const amount = Number(e.amount) || 0;
+    byMonth[m][e.category] = (byMonth[m][e.category] ?? 0) + amount;
+    monthTotals[m] += amount;
+  }
+  return { byMonth, monthTotals };
+}
+
+// The twelve *actual* numbers for one fund row.
+//
+// Which source depends on what kind of fund it is. A savings fund's reality is
+// what the user confirmed setting aside (`contributions`, written from
+// SavingsPanel); a spending fund's is the expenses filed under its mapped
+// categories. Reading expenses for a savings fund would measure it against
+// spending that has nothing to do with it — the same trap BudgetPanel avoids.
+//
+// A spending fund with nothing mapped returns all-null, not all-zero: "not
+// tracked" and "tracked, spent nothing" are different answers and the grid
+// renders them differently.
+export function fundActuals(fund, mappedCats, byMonth) {
+  if (isSavingsFund(fund)) {
+    const contributions = fund.contributions ?? [];
+    return Array.from({ length: 12 }, (_, m) => contributions[m] ?? null);
+  }
+  if (!mappedCats?.length) return Array(12).fill(null);
+  return Array.from({ length: 12 }, (_, m) => {
+    const totals = byMonth[m] ?? {};
+    return mappedCats.reduce((sum, cat) => sum + (totals[cat] ?? 0), 0);
+  });
+}
+
+// What was spent outside every tracked fund, per month.
+//
+// Subtracted over the *union* of all mapped categories, not fund by fund: a
+// category mapped to two funds is deliberately counted in both of their rows,
+// but subtracting it twice here would push this row negative and make the
+// column stop adding up.
+export function unmappedSpend(byMonth, monthTotals, yearMaps) {
+  const mapped = new Set();
+  Object.values(yearMaps ?? {}).forEach((cats) => (cats ?? []).forEach((c) => mapped.add(c)));
+  return monthTotals.map((total, m) => {
+    let tracked = 0;
+    for (const [cat, amount] of Object.entries(byMonth[m] ?? {})) {
+      if (mapped.has(cat)) tracked += amount;
+    }
+    return total - tracked;
+  });
+}
+
 // "Nothing worth keeping yet." Used to decide whether restoring from the backup
 // file is safe — categories alone are defaults, so they don't count as content.
 export function isEmptyData(data) {
@@ -12,6 +109,7 @@ export function isEmptyData(data) {
     (data.savingsGoals?.length ?? 0) === 0 &&
     Object.keys(data.budget ?? {}).length === 0 &&
     Object.keys(data.monthlyNotes ?? {}).length === 0 &&
+    Object.keys(data.actualIncome ?? {}).length === 0 &&
     (data.categoryGroups?.length ?? 0) === 0
   );
 }

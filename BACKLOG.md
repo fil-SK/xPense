@@ -3,6 +3,41 @@
 Known gaps that were consciously deferred, with enough context to pick them up cold.
 Newest first. Remove an entry when it ships.
 
+## Live pregled: there is no forecast, only plan and actual
+
+**Deferred:** 2026-08-14, while building the live overview.
+
+There are really three numbers per row, and the app now has two of them:
+
+| | Food 2026 |
+|---|---|
+| Budget — what I planned in January | 6.000 |
+| Actual — what has happened Jan–Aug | 4.700 |
+| **Forecast — where I now think I'll land** | **6.900** |
+
+They answer different questions, and the missing third one is what the tester was
+reaching for when they edited *future* budget months after a pay raise. They weren't
+trying to rewrite history — they were trying to say "from here on, income is 2.300".
+The app had nowhere to put that, so it went into the plan and destroyed the baseline.
+The overview fixes the past half of this; the future half is still unaddressed.
+
+**Proposed fix:** a third line per cell (or a `Projekcija` column) computed as actual
+through the elapsed months plus a projection for the rest — plan-based by default, with
+a run-rate alternative for rows where the plan has already proven wrong. It needs no new
+stored data if the projection stays derived; it needs a `forecast` override field if the
+user should be able to say "from June, income is 2.300" without touching the budget.
+Decide that first — it is the difference between a display change and a fourth data layer.
+
+**Effort:** medium. Left out deliberately: actuals were the piece that was actually
+missing, and shipping a third number per cell at the same time would have doubled the
+grid's design surface before anyone had used the second one.
+
+**Note:** the "under plan isn't automatically good" rule applies here too, and harder —
+a forecast that lands under a spending plan is good news, while one that lands under a
+savings plan is a warning. Reuse `varianceStatus`, don't hand-roll a comparison.
+
+---
+
 ## Savings: nothing stops you confirming a month that hasn't happened
 
 **Deferred:** 2026-08-14, while adding savings funds and confirmed contributions.

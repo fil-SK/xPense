@@ -1,6 +1,7 @@
 import {
   generateRecurringExpenses, applyBudgetCopy, isEmptyData, applyExpenseDeletion,
   elapsedMonths, goalProgress, isSavingsFund, NO_PROGRESS,
+  statusKey, varianceStatus, monthlyCategoryTotals, fundActuals, unmappedSpend,
 } from '../utils/dataTransforms.js';
 
 // ─── isEmptyData ──────────────────────────────────────────────────────────────
@@ -31,6 +32,7 @@ describe('isEmptyData', () => {
     ['savingsGoals', { savingsGoals: [{ id: 'g1' }] }],
     ['monthlyNotes', { monthlyNotes: { 2025: { 0: 'beleska' } } }],
     ['categoryGroups', { categoryGroups: [{ id: 'g', name: 'Režije', categories: [] }] }],
+    ['actualIncome', { actualIncome: { 2026: { plata: Array(12).fill(null) } } }],
   ])('%s makes it non-empty', (_label, patch) => {
     expect(isEmptyData({ ...blank, ...patch })).toBe(false);
   });
@@ -466,6 +468,170 @@ describe('isSavingsFund', () => {
   test('a missing fund is handled without throwing', () => {
     expect(isSavingsFund(undefined)).toBe(false);
     expect(isSavingsFund(null)).toBe(false);
+  });
+});
+
+// ─── statusKey ────────────────────────────────────────────────────────────────
+
+describe('statusKey', () => {
+  test('grades the spent/allocated ratio', () => {
+    expect(statusKey(null)).toBe('unset');
+    expect(statusKey(1.01)).toBe('over');
+    expect(statusKey(0.9)).toBe('warn');
+    expect(statusKey(0.89)).toBe('ok');
+    // Exactly on the allocation is spent-in-full, not over it.
+    expect(statusKey(1)).toBe('warn');
+  });
+});
+
+// ─── varianceStatus ───────────────────────────────────────────────────────────
+
+describe('varianceStatus', () => {
+  // The whole reason this exists instead of a single red/green scale: the same
+  // pair of numbers means opposite things on a spending row and a savings row.
+  test('a spending row under plan is unremarkable, not a win', () => {
+    expect(varianceStatus(300, 500, { higherIsBetter: false })).toBe('onTrack');
+  });
+
+  test('a spending row over plan is behind', () => {
+    expect(varianceStatus(700, 500, { higherIsBetter: false })).toBe('behind');
+  });
+
+  test('a savings row under plan is behind, over plan is ahead', () => {
+    expect(varianceStatus(100, 200, { higherIsBetter: true })).toBe('behind');
+    expect(varianceStatus(300, 200, { higherIsBetter: true })).toBe('ahead');
+  });
+
+  test('hitting the plan exactly reads the same either way', () => {
+    expect(varianceStatus(500, 500, { higherIsBetter: false })).toBe('onTrack');
+    expect(varianceStatus(500, 500, { higherIsBetter: true })).toBe('onTrack');
+  });
+
+  // No plan (or no actual) is not a variance of zero — there is nothing to
+  // compare, and colouring it would invent a judgement.
+  test('a missing side is unset, and a confirmed 0 is still a real number', () => {
+    expect(varianceStatus(null, 500, { higherIsBetter: true })).toBe('unset');
+    expect(varianceStatus(500, null, { higherIsBetter: true })).toBe('unset');
+    expect(varianceStatus(0, 200, { higherIsBetter: true })).toBe('behind');
+  });
+});
+
+// ─── monthlyCategoryTotals ────────────────────────────────────────────────────
+
+describe('monthlyCategoryTotals', () => {
+  const expenses = [
+    { id: '1', date: '2026-01-05', amount: 100, category: 'Hrana' },
+    { id: '2', date: '2026-01-20', amount: 50, category: 'Hrana' },
+    { id: '3', date: '2026-01-20', amount: 400, category: 'Prevoz' },
+    { id: '4', date: '2026-03-01', amount: 900, category: 'Hrana' },
+    { id: '5', date: '2025-01-01', amount: 777, category: 'Hrana' },
+  ];
+
+  test('buckets one year into per-month category totals', () => {
+    const { byMonth, monthTotals } = monthlyCategoryTotals(expenses, 2026);
+    expect(byMonth[0]).toEqual({ Hrana: 150, Prevoz: 400 });
+    expect(byMonth[2]).toEqual({ Hrana: 900 });
+    expect(byMonth[1]).toEqual({});
+    expect(monthTotals[0]).toBe(550);
+    expect(monthTotals[1]).toBe(0);
+  });
+
+  test('another year is left out entirely', () => {
+    const { monthTotals } = monthlyCategoryTotals(expenses, 2025);
+    expect(monthTotals[0]).toBe(777);
+    expect(monthlyCategoryTotals(expenses, 2026).monthTotals.reduce((s, v) => s + v, 0)).toBe(1450);
+  });
+
+  // Same reasoning as getExpensesForMonth: a stale '2026-02-31' parses as March
+  // 3, so a Date-based bucket would file it under March. The month it *names*
+  // is the month the user meant.
+  test('an out-of-range day stays in the month it names', () => {
+    const { byMonth } = monthlyCategoryTotals(
+      [{ id: 'x', date: '2026-02-31', amount: 60, category: 'Hrana' }], 2026
+    );
+    expect(byMonth[1]).toEqual({ Hrana: 60 });
+    expect(byMonth[2]).toEqual({});
+  });
+
+  test('a dateless or malformed row is skipped rather than filed under NaN', () => {
+    const { monthTotals } = monthlyCategoryTotals(
+      [{ id: 'x', amount: 60, category: 'Hrana' }, { id: 'y', date: '2026-13-01', amount: 5, category: 'Hrana' }],
+      2026
+    );
+    expect(monthTotals.every((v) => v === 0)).toBe(true);
+  });
+});
+
+// ─── fundActuals ──────────────────────────────────────────────────────────────
+
+describe('fundActuals', () => {
+  const byMonth = [{ Hrana: 620, Prevoz: 100 }, { Hrana: 540 }, ...Array(10).fill({})];
+
+  test('a spending fund sums its mapped categories per month', () => {
+    const actual = fundActuals({ id: 'f1', name: 'Hrana', amounts: [] }, ['Hrana', 'Prevoz'], byMonth);
+    expect(actual[0]).toBe(720);
+    expect(actual[1]).toBe(540);
+    expect(actual[2]).toBe(0);
+  });
+
+  // "Nothing mapped" and "mapped, spent nothing" are different answers and the
+  // grid renders them differently — an all-zero row would claim tracking that
+  // isn't happening.
+  test('a spending fund with nothing mapped reads null, not zero', () => {
+    expect(fundActuals({ id: 'f1', amounts: [] }, [], byMonth)).toEqual(Array(12).fill(null));
+    expect(fundActuals({ id: 'f1', amounts: [] }, undefined, byMonth)).toEqual(Array(12).fill(null));
+  });
+
+  // Its money was set aside, not spent. Reading expenses here would measure it
+  // against spending that has nothing to do with it — including through a
+  // stale mapping left over from before the 💰 flag was switched on.
+  test('a savings fund reads its contributions and ignores expenses', () => {
+    const contributions = Array(12).fill(null);
+    contributions[0] = 200;
+    contributions[1] = 0;
+    const actual = fundActuals(
+      { id: 'f2', kind: 'savings', amounts: [], contributions },
+      ['Hrana'],
+      byMonth
+    );
+    expect(actual[0]).toBe(200);
+    expect(actual[1]).toBe(0);
+    expect(actual[2]).toBeNull();
+  });
+
+  test('a savings fund with no confirmations yet is all null', () => {
+    expect(fundActuals({ id: 'f2', kind: 'savings', amounts: [] }, [], byMonth))
+      .toEqual(Array(12).fill(null));
+  });
+});
+
+// ─── unmappedSpend ────────────────────────────────────────────────────────────
+
+describe('unmappedSpend', () => {
+  const byMonth = [{ Hrana: 600, Prevoz: 100, Pokloni: 40 }, ...Array(11).fill({})];
+  const monthTotals = [740, ...Array(11).fill(0)];
+
+  test('reports what was spent outside every tracked fund', () => {
+    const result = unmappedSpend(byMonth, monthTotals, { f1: ['Hrana'], f2: ['Prevoz'] });
+    expect(result[0]).toBe(40);
+    expect(result[1]).toBe(0);
+  });
+
+  // A category mapped to two funds is counted in both of their rows on purpose.
+  // Subtracting it twice here would push this row negative and stop the column
+  // adding up.
+  test('a category mapped to two funds is subtracted only once', () => {
+    const result = unmappedSpend(byMonth, monthTotals, { f1: ['Hrana'], f2: ['Hrana', 'Prevoz'] });
+    expect(result[0]).toBe(40);
+  });
+
+  test('with nothing mapped every dinar is outside the budget', () => {
+    expect(unmappedSpend(byMonth, monthTotals, {})[0]).toBe(740);
+    expect(unmappedSpend(byMonth, monthTotals, undefined)[0]).toBe(740);
+  });
+
+  test('a fund with an empty or absent category list is tolerated', () => {
+    expect(unmappedSpend(byMonth, monthTotals, { f1: [], f2: undefined })[0]).toBe(740);
   });
 });
 

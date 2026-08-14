@@ -149,6 +149,33 @@ export const budgetHandlers = {
     budget: { ...data.budget, ...budget },
   }),
 
+  // What actually came in, month by month, as an override on top of the plan.
+  //
+  // It is stored apart from `budget[year].income` on purpose. The budget is the
+  // baseline the year is measured against, and rewriting it to match reality is
+  // exactly the habit the overview exists to replace — once the plan says what
+  // happened, the variance is gone and there is nothing left to compare to.
+  //
+  // Sparse: `null` means "no override, show the plan", which is what
+  // parseAmountInput already returns for an emptied field, so clearing a cell
+  // reverts it to the plan with no special case. Keyed by row — 'plata',
+  // 'bonus', or a custom income row's id — so deleting a row orphans nothing
+  // that a lookup would trip over.
+  'actualIncome/set': (data, { year, rowKey, monthIdx, value }) => {
+    const forYear = data.actualIncome?.[year] ?? {};
+    const base = forYear[rowKey] ?? Array(12).fill(null);
+    return {
+      ...data,
+      actualIncome: {
+        ...data.actualIncome,
+        [year]: {
+          ...forYear,
+          [rowKey]: base.map((v, i) => (i === monthIdx ? value : v)),
+        },
+      },
+    };
+  },
+
   'tracking/set': (data, { year, fundId, categories }) => ({
     ...data,
     trackingMaps: {

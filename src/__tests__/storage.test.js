@@ -31,7 +31,18 @@ describe('withDefaults', () => {
     expect(filled.monthlyNotes).toEqual({});
     expect(filled.savingsGoals).toEqual([]);
     expect(filled.categoryGroups).toEqual([]);
+    expect(filled.actualIncome).toEqual({});
     expect(filled.categories.length).toBeGreaterThan(0);
+  });
+
+  // Actual income is the one thing the overview page writes, so it has to
+  // survive a load like any other stored field — and a wrong-typed one must
+  // not reach the grid, where a lookup would throw.
+  test('keeps a stored actualIncome year and rejects a wrong-typed one', () => {
+    const stored = { 2026: { plata: [null, 230000, ...Array(10).fill(null)] } };
+    expect(withDefaults({ actualIncome: stored }).actualIncome).toEqual(stored);
+    expect(withDefaults({ actualIncome: [] }).actualIncome).toEqual({});
+    expect(withDefaults({ actualIncome: 'nope' }).actualIncome).toEqual({});
   });
 
   // `budget` is passed through as an opaque object, which is what lets a fund
@@ -178,6 +189,7 @@ describe('loadData', () => {
       expenses: [{ id: '1', title: 'Test', date: '2025-01-01', amount: 100, category: 'Hrana' }],
       categories: ['Hrana', 'Transport'],
       budget: {},
+      actualIncome: {},
       trackingMaps: {},
       recurrings: [],
       monthlyNotes: { 2025: { 2: 'Skupo zbog auta' } },
@@ -225,6 +237,7 @@ describe('saveData / loadData roundtrip', () => {
           funds: [],
         },
       },
+      actualIncome: { 2025: { plata: Array(12).fill(null) } },
       trackingMaps: {},
       recurrings: [{ id: 'r1', title: 'Netflix', amount: 800, category: 'Zabava', startDate: '2025-01-01', frequency: 'monthly' }],
       monthlyNotes: { 2025: { 2: 'Auto servis' } },

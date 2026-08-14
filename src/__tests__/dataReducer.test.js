@@ -71,6 +71,7 @@ describe('dataReducer routing', () => {
     run(data, 'budget/removeFund', { year: 2025, fundId: 'f1' });
     run(data, 'budget/setFundKind', { year: 2025, fundId: 'f1', kind: 'savings' });
     run(data, 'budget/setFundContribution', { year: 2025, fundId: 'f1', monthIdx: 0, value: 500 });
+    run(data, 'actualIncome/set', { year: 2025, rowKey: 'plata', monthIdx: 0, value: 500 });
     run(data, 'data/restore', { snapshot: baseData(), keys: ['expenses'] });
     expect(data).toEqual(snapshot);
   });
@@ -373,6 +374,41 @@ describe('budget slice', () => {
   test('budget/setFundContribution stores a confirmed zero as zero, not null', () => {
     const result = run(baseData(), 'budget/setFundContribution', { year: 2025, fundId: 'f1', monthIdx: 0, value: 0 });
     expect(result.budget[2025].funds[0].contributions[0]).toBe(0);
+  });
+
+  // Actual income is stored apart from budget[year].income on purpose: the plan
+  // is the benchmark, and writing reality into it is the habit the overview
+  // exists to replace. These pin that the two never touch.
+  test('actualIncome/set mints the twelve slots and leaves the budget alone', () => {
+    const result = run(baseData(), 'actualIncome/set', { year: 2025, rowKey: 'plata', monthIdx: 3, value: 230000 });
+    expect(result.actualIncome[2025].plata).toHaveLength(12);
+    expect(result.actualIncome[2025].plata[3]).toBe(230000);
+    expect(result.actualIncome[2025].plata[2]).toBeNull();
+    expect(result.budget[2025].income.plata).toEqual(baseData().budget[2025].income.plata);
+  });
+
+  test('actualIncome/set keeps rows and years apart', () => {
+    const one = run(baseData(), 'actualIncome/set', { year: 2025, rowKey: 'plata', monthIdx: 0, value: 100 });
+    const two = run(one, 'actualIncome/set', { year: 2025, rowKey: 'bonus', monthIdx: 0, value: 50 });
+    const three = run(two, 'actualIncome/set', { year: 2026, rowKey: 'plata', monthIdx: 0, value: 900 });
+    expect(three.actualIncome[2025].plata[0]).toBe(100);
+    expect(three.actualIncome[2025].bonus[0]).toBe(50);
+    expect(three.actualIncome[2026].plata[0]).toBe(900);
+  });
+
+  // Clearing the field reverts the month to the plan — parseAmountInput already
+  // returns null for an emptied cell, so this is the whole revert mechanism.
+  test('actualIncome/set with null drops just that month back to the plan', () => {
+    const one = run(baseData(), 'actualIncome/set', { year: 2025, rowKey: 'plata', monthIdx: 0, value: 100 });
+    const two = run(one, 'actualIncome/set', { year: 2025, rowKey: 'plata', monthIdx: 1, value: 200 });
+    const cleared = run(two, 'actualIncome/set', { year: 2025, rowKey: 'plata', monthIdx: 0, value: null });
+    expect(cleared.actualIncome[2025].plata[0]).toBeNull();
+    expect(cleared.actualIncome[2025].plata[1]).toBe(200);
+  });
+
+  test('actualIncome/set stores a real zero as zero', () => {
+    const result = run(baseData(), 'actualIncome/set', { year: 2025, rowKey: 'bonus', monthIdx: 5, value: 0 });
+    expect(result.actualIncome[2025].bonus[5]).toBe(0);
   });
 
   test('budget/addFund appends to the year', () => {

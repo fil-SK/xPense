@@ -1,15 +1,6 @@
 import { useApp } from '../App.jsx';
 import { getExpensesForMonth, getTotalAmount } from '../utils/helpers.js';
-import { isSavingsFund } from '../utils/dataTransforms.js';
-
-const THRESHOLD_WARN = 0.9;
-
-function statusKey(ratio) {
-  if (ratio === null) return 'unset';
-  if (ratio > 1) return 'over';
-  if (ratio >= THRESHOLD_WARN) return 'warn';
-  return 'ok';
-}
+import { isSavingsFund, statusKey } from '../utils/dataTransforms.js';
 
 function fmt(n) {
   return n.toLocaleString('sr-RS');
