@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Commands
 
@@ -115,7 +115,7 @@ Recovery rules, all of which exist to protect the backup file:
 
 `src/utils/storage.js` handles localStorage read/write, JSON import/export, and CSV export (`buildCSVString` + `exportCSV`). The BOM prefix in `exportCSV` ensures Excel opens the file with correct UTF-8 encoding.
 
-**Import is guarded in three stages**, because it replaces every record and the export button is labelled "za Claude" — hand-edited files are an expected input, not an exotic one:
+**Import is guarded in three stages**, because it replaces every record and the export button is labelled "za Codex" — hand-edited files are an expected input, not an exotic one:
 1. `importJSON` rejects anything that isn't recognisably an xPense export (`expenses`/`categories` must be arrays).
 2. `validateImportData` sanitises each expense and returns `{ data, skipped }`. Only an unusable date or a non-numeric amount drops a row; a missing title becomes `'Bez naziva'`, a missing category `'Ostalo'`, missing ids are generated, and duplicate ids are re-issued so React keys stay unique. Out-of-range days are repaired rather than rejected. `withDefaults` type-checks each top-level field, so a wrong-typed `budget` can no longer reach the UI.
 

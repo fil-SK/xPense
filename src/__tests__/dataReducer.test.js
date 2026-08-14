@@ -259,10 +259,57 @@ describe('categories slice', () => {
 });
 
 describe('budget slice', () => {
+  const withIncomeRows = () => {
+    const data = baseData();
+    data.budget[2025].income.extra = [
+      { id: 'i1', name: 'Honorar', amounts: Array(12).fill(null) },
+      { id: 'i2', name: 'Izdavanje', amounts: Array(12).fill(null) },
+    ];
+    return data;
+  };
+
   test('budget/setIncome writes one month', () => {
     const result = run(baseData(), 'budget/setIncome', { year: 2025, field: 'plata', monthIdx: 2, value: 90000 });
     expect(result.budget[2025].income.plata[2]).toBe(90000);
     expect(result.budget[2025].income.plata[1]).toBeNull();
+  });
+
+  // baseData has no `income.extra` — budgets saved before custom income rows
+  // existed don't, so every handler has to cope with the key being absent.
+  test('budget/addIncomeRow appends to a year that never had an extra list', () => {
+    const row = { id: 'i1', name: 'Honorar', amounts: Array(12).fill(null) };
+    const result = run(baseData(), 'budget/addIncomeRow', { year: 2025, row });
+    expect(result.budget[2025].income.extra).toEqual([row]);
+    expect(result.budget[2025].income.plata).toHaveLength(12);
+    expect(result.budget[2025].funds).toHaveLength(2);
+  });
+
+  test('budget/addIncomeRow creates a year that does not exist yet', () => {
+    const row = { id: 'i1', name: 'Honorar', amounts: Array(12).fill(null) };
+    const result = run(baseData(), 'budget/addIncomeRow', { year: 2030, row });
+    expect(result.budget[2030].income.extra).toEqual([row]);
+    expect(result.budget[2030].funds).toEqual([]);
+  });
+
+  test('budget/setIncomeRowAmount writes one cell of one row', () => {
+    const withRows = withIncomeRows();
+    const result = run(withRows, 'budget/setIncomeRowAmount', { year: 2025, rowId: 'i2', monthIdx: 3, value: 12000 });
+    expect(result.budget[2025].income.extra[1].amounts[3]).toBe(12000);
+    expect(result.budget[2025].income.extra[0].amounts[3]).toBeNull();
+    expect(withRows.budget[2025].income.extra[1].amounts[3]).toBeNull();
+  });
+
+  test('budget/removeIncomeRow and budget/renameIncomeRow', () => {
+    expect(run(withIncomeRows(), 'budget/removeIncomeRow', { year: 2025, rowId: 'i1' })
+      .budget[2025].income.extra.map((r) => r.id)).toEqual(['i2']);
+    expect(run(withIncomeRows(), 'budget/renameIncomeRow', { year: 2025, rowId: 'i1', name: 'Freelance' })
+      .budget[2025].income.extra[0].name).toBe('Freelance');
+  });
+
+  test('income row handlers leave plata and bonus alone', () => {
+    const result = run(withIncomeRows(), 'budget/removeIncomeRow', { year: 2025, rowId: 'i1' });
+    expect(result.budget[2025].income.plata).toHaveLength(12);
+    expect(result.budget[2025].income.bonus).toHaveLength(12);
   });
 
   test('budget/setFundAmount writes one cell of one fund', () => {

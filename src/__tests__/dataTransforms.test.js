@@ -349,6 +349,32 @@ describe('applyBudgetCopy', () => {
     expect(result.budget[2026].income.bonus).toEqual(Array(12).fill(null));
   });
 
+  // baseData has no `income.extra`; the copy must not invent a broken shape.
+  test('a year without custom income rows copies to an empty list', () => {
+    const result = applyBudgetCopy(baseData, 2025, 2026);
+    expect(result.budget[2026].income.extra).toEqual([]);
+  });
+
+  test('copies custom income row names with fresh ids and empty amounts', () => {
+    const amounts = Array(12).fill(null);
+    amounts[0] = 8000;
+    const withRows = {
+      ...baseData,
+      budget: {
+        ...baseData.budget,
+        2025: {
+          ...baseData.budget[2025],
+          income: { ...baseData.budget[2025].income, extra: [{ id: 'i1', name: 'Honorar', amounts }] },
+        },
+      },
+    };
+    const result = applyBudgetCopy(withRows, 2025, 2026);
+    const [copied] = result.budget[2026].income.extra;
+    expect(copied.name).toBe('Honorar');
+    expect(copied.id).not.toBe('i1');
+    expect(copied.amounts).toEqual(Array(12).fill(null));
+  });
+
   test('remaps trackingMaps to new fund IDs preserving category lists', () => {
     const result = applyBudgetCopy(baseData, 2025, 2026);
     const newIds = result.budget[2026].funds.map((f) => f.id);

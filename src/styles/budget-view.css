@@ -170,7 +170,8 @@ thead .bg__col--current { background: #e0e7ff !important; }
   font-size: 13px;
   letter-spacing: .3px;
 }
-.bg__row-label--fund {
+.bg__row-label--fund,
+.bg__row-label--income {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -291,7 +292,8 @@ thead .bg__col--current { background: #e0e7ff !important; }
   line-height: 1;
   flex-shrink: 0;
 }
-.bg__row--fund:hover .bg__del-btn { opacity: 1; }
+.bg__row--fund:hover .bg__del-btn,
+.bg__row--income:hover .bg__del-btn { opacity: 1; }
 /* A keyboard user never hovers, so the button would otherwise be focusable and
    invisible — and it now deletes on the first press. */
 .bg__del-btn:focus-visible { opacity: 1; }

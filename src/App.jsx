@@ -344,6 +344,24 @@ export default function App() {
 
     updateBudgetIncome: (year, field, monthIdx, value) =>
       dispatch({ type: 'budget/setIncome', payload: { year, field, monthIdx, value } }),
+    updateBudgetIncomeRow: (year, rowId, monthIdx, value) =>
+      dispatch({ type: 'budget/setIncomeRowAmount', payload: { year, rowId, monthIdx, value } }),
+    addBudgetIncomeRow: (year, name) =>
+      dispatch({
+        type: 'budget/addIncomeRow',
+        payload: { year, row: { id: newId(), name, amounts: Array(12).fill(null) } },
+      }),
+    // Nothing but `budget` holds an income row — trackingMaps only maps funds.
+    removeBudgetIncomeRow: (year, rowId) => {
+      deleteWithUndo(
+        ['budget'],
+        () => dispatch({ type: 'budget/removeIncomeRow', payload: { year, rowId } }),
+        'Prihod obrisan.',
+        'Prihod vraćen.'
+      );
+    },
+    renameBudgetIncomeRow: (year, rowId, name) =>
+      dispatch({ type: 'budget/renameIncomeRow', payload: { year, rowId, name } }),
     updateBudgetFund: (year, fundId, monthIdx, value) =>
       dispatch({ type: 'budget/setFundAmount', payload: { year, fundId, monthIdx, value } }),
     addBudgetFund: (year, name) =>

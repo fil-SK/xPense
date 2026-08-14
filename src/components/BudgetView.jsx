@@ -202,6 +202,7 @@ function SortableFundRow({
 export default function BudgetView() {
   const {
     data, updateBudgetIncome, updateBudgetFund, addBudgetFund,
+    updateBudgetIncomeRow, addBudgetIncomeRow, removeBudgetIncomeRow, renameBudgetIncomeRow,
     removeBudgetFund, renameBudgetFund, reorderBudgetFunds,
     copyBudgetToYear, importBudgetData, showToast, updateTrackingMap,
   } = useApp();
@@ -211,23 +212,30 @@ export default function BudgetView() {
   const currentMonth = year === thisYear ? new Date().getMonth() : -1;
 
   const yb = data.budget?.[year] ?? {
-    income: { plata: Array(12).fill(null), bonus: Array(12).fill(null) },
+    income: { plata: Array(12).fill(null), bonus: Array(12).fill(null), extra: [] },
     funds: [],
   };
+  const extraIncome = yb.income.extra ?? [];
 
   const [newFundName, setNewFundName] = useState('');
   const [editingFundId, setEditingFundId] = useState(null);
   const [editingFundName, setEditingFundName] = useState('');
+  const [newIncomeName, setNewIncomeName] = useState('');
+  const [editingIncomeId, setEditingIncomeId] = useState(null);
+  const [editingIncomeName, setEditingIncomeName] = useState('');
   const [copyConfirm, setCopyConfirm] = useState(false);
   const [expandedFundId, setExpandedFundId] = useState(null);
   const addInputRef = useRef(null);
+  const addIncomeRef = useRef(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
 
   const inPerMonth = Array.from({ length: 12 }, (_, i) =>
-    (yb.income.plata[i] ?? 0) + (yb.income.bonus[i] ?? 0)
+    (yb.income.plata[i] ?? 0) +
+    (yb.income.bonus[i] ?? 0) +
+    extraIncome.reduce((s, r) => s + (r.amounts[i] ?? 0), 0)
   );
   const outPerMonth = Array.from({ length: 12 }, (_, i) =>
     yb.funds.reduce((s, f) => s + (f.amounts[i] ?? 0), 0)
@@ -236,7 +244,10 @@ export default function BudgetView() {
   const totalIn = inPerMonth.reduce((s, v) => s + v, 0);
   const totalOut = outPerMonth.reduce((s, v) => s + v, 0);
   const totalBalance = totalIn - totalOut;
-  const hasAnyIn = yb.income.plata.some((v) => v != null) || yb.income.bonus.some((v) => v != null);
+  const hasAnyIn =
+    yb.income.plata.some((v) => v != null) ||
+    yb.income.bonus.some((v) => v != null) ||
+    extraIncome.some((r) => r.amounts.some((v) => v != null));
   const hasAnyOut = yb.funds.some((f) => f.amounts.some((v) => v != null));
 
   function handleAddFund() {
@@ -245,6 +256,19 @@ export default function BudgetView() {
     addBudgetFund(year, name);
     setNewFundName('');
     addInputRef.current?.focus();
+  }
+
+  function handleAddIncomeRow() {
+    const name = newIncomeName.trim();
+    if (!name) return;
+    addBudgetIncomeRow(year, name);
+    setNewIncomeName('');
+    addIncomeRef.current?.focus();
+  }
+
+  function handleRenameIncomeRow(rowId) {
+    if (editingIncomeName.trim()) renameBudgetIncomeRow(year, rowId, editingIncomeName.trim());
+    setEditingIncomeId(null);
   }
 
   function handleStartRename(fundId, name) {
@@ -262,7 +286,8 @@ export default function BudgetView() {
     const hasExisting = !!(
       data.budget?.[nextYear] &&
       (data.budget[nextYear].funds?.length > 0 ||
-        data.budget[nextYear].income?.plata.some((v) => v != null))
+        data.budget[nextYear].income?.plata.some((v) => v != null) ||
+        data.budget[nextYear].income?.extra?.length > 0)
     );
     if (hasExisting && !copyConfirm) {
       setCopyConfirm(true);
@@ -408,6 +433,80 @@ export default function BudgetView() {
                 </tr>
               );
             })}
+
+            {/* Custom income rows — same twelve cells, plus rename and delete. */}
+            {extraIncome.map((row) => {
+              const total = rowTotal(row.amounts);
+              return (
+                <tr key={row.id} className="bg__row bg__row--income">
+                  <td className="bg__label-col bg__row-label bg__row-label--income">
+                    {editingIncomeId === row.id ? (
+                      <input
+                        className="bg__fund-name-input"
+                        value={editingIncomeName}
+                        autoFocus
+                        onChange={(e) => setEditingIncomeName(e.target.value)}
+                        onBlur={() => handleRenameIncomeRow(row.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleRenameIncomeRow(row.id);
+                          if (e.key === 'Escape') setEditingIncomeId(null);
+                        }}
+                      />
+                    ) : (
+                      <span
+                        className="bg__fund-name"
+                        onDoubleClick={() => {
+                          setEditingIncomeId(row.id);
+                          setEditingIncomeName(row.name);
+                        }}
+                        title="Dvoklikom preimenuj"
+                      >
+                        {row.name}
+                      </span>
+                    )}
+
+                    {/* One click — the undo on the toast replaces the confirm. */}
+                    <button
+                      className="bg__del-btn"
+                      onClick={() => removeBudgetIncomeRow(year, row.id)}
+                      title="Obriši red"
+                      aria-label={`Obriši prihod: ${row.name}`}
+                    >
+                      ×
+                    </button>
+                  </td>
+
+                  {cols.map((m) => (
+                    <td key={m} className={`bg__cell ${m === currentMonth ? 'bg__col--current' : ''}`}>
+                      <BudgetCell
+                        value={row.amounts[m]}
+                        onSave={(v) => updateBudgetIncomeRow(year, row.id, m, v)}
+                      />
+                    </td>
+                  ))}
+
+                  <td className="bg__total-cell">{fmt(total)}</td>
+                </tr>
+              );
+            })}
+
+            {/* Add income row */}
+            <tr className="bg__add-row">
+              <td colSpan={14} className="bg__add-cell">
+                <input
+                  ref={addIncomeRef}
+                  className="bg__add-input"
+                  placeholder="+ Dodaj prihod (npr. honorar, izdavanje)..."
+                  aria-label="Dodaj prihod"
+                  value={newIncomeName}
+                  onChange={(e) => setNewIncomeName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddIncomeRow()}
+                />
+                {newIncomeName.trim() && (
+                  <button className="btn btn--primary btn--sm" onClick={handleAddIncomeRow}>Dodaj</button>
+                )}
+              </td>
+            </tr>
 
             <tr className="bg__subtotal-row">
               <td className="bg__label-col bg__row-label bg__row-label--sub">Ukupno prihodi</td>

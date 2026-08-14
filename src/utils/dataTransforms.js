@@ -140,7 +140,17 @@ export function applyBudgetCopy(data, fromYear, toYear) {
     budget: {
       ...data.budget,
       [toYear]: {
-        income: { plata: [...source.income.plata], bonus: Array(12).fill(null) },
+        income: {
+          plata: [...source.income.plata],
+          bonus: Array(12).fill(null),
+          // Custom income rows carry over as structure only, like the funds —
+          // last year's amounts on a one-off income would be a guess.
+          extra: (source.income.extra ?? []).map((r) => ({
+            id: crypto.randomUUID(),
+            name: r.name,
+            amounts: Array(12).fill(null),
+          })),
+        },
         funds: newFunds,
       },
     },

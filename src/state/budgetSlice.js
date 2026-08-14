@@ -8,10 +8,14 @@ import { applyBudgetCopy } from '../utils/dataTransforms.js';
 // from this shape rather than guarding for undefined.
 export function getYearBudget(data, year) {
   return data.budget?.[year] ?? {
-    income: { plata: Array(12).fill(null), bonus: Array(12).fill(null) },
+    income: { plata: Array(12).fill(null), bonus: Array(12).fill(null), extra: [] },
     funds: [],
   };
 }
+
+// `income.extra` was added after the first budgets were saved, so a stored year
+// may not have it at all — read it through here, never off the object directly.
+export const incomeExtra = (yb) => yb.income?.extra ?? [];
 
 const setYear = (data, year, yearBudget) => ({
   ...data,
@@ -23,12 +27,49 @@ const setFunds = (data, year, funds) => {
   return setYear(data, year, { ...yb, funds });
 };
 
+const setIncomeExtra = (data, year, extra) => {
+  const yb = getYearBudget(data, year);
+  return setYear(data, year, { ...yb, income: { ...yb.income, extra } });
+};
+
 export const budgetHandlers = {
   'budget/setIncome': (data, { year, field, monthIdx, value }) => {
     const yb = getYearBudget(data, year);
     const amounts = yb.income[field].map((v, i) => (i === monthIdx ? value : v));
     return setYear(data, year, { ...yb, income: { ...yb.income, [field]: amounts } });
   },
+
+  // Custom income rows live beside the fixed plata/bonus ones and carry the
+  // same twelve-slot shape as a fund.
+  'budget/setIncomeRowAmount': (data, { year, rowId, monthIdx, value }) => {
+    const yb = getYearBudget(data, year);
+    return setIncomeExtra(
+      data,
+      year,
+      incomeExtra(yb).map((r) =>
+        r.id === rowId
+          ? { ...r, amounts: r.amounts.map((v, i) => (i === monthIdx ? value : v)) }
+          : r
+      )
+    );
+  },
+
+  'budget/addIncomeRow': (data, { year, row }) =>
+    setIncomeExtra(data, year, [...incomeExtra(getYearBudget(data, year)), row]),
+
+  'budget/removeIncomeRow': (data, { year, rowId }) =>
+    setIncomeExtra(
+      data,
+      year,
+      incomeExtra(getYearBudget(data, year)).filter((r) => r.id !== rowId)
+    ),
+
+  'budget/renameIncomeRow': (data, { year, rowId, name }) =>
+    setIncomeExtra(
+      data,
+      year,
+      incomeExtra(getYearBudget(data, year)).map((r) => (r.id === rowId ? { ...r, name } : r))
+    ),
 
   'budget/setFundAmount': (data, { year, fundId, monthIdx, value }) => {
     const yb = getYearBudget(data, year);

@@ -10,10 +10,12 @@ const FUND_ID_2 = 'fund-2';
 const BASE_FUND = { id: FUND_ID, name: 'Mesečni rashodi', amounts: Array(12).fill(null) };
 const FUND_2 = { id: FUND_ID_2, name: 'Štednja', amounts: Array(12).fill(null) };
 
-function makeBudget(funds = [BASE_FUND]) {
+// No `income.extra` key here on purpose — budgets saved before custom income
+// rows existed don't have one, and the view has to tolerate that.
+function makeBudget(funds = [BASE_FUND], income = {}) {
   return {
     [YEAR]: {
-      income: { plata: Array(12).fill(null), bonus: Array(12).fill(null) },
+      income: { plata: Array(12).fill(null), bonus: Array(12).fill(null), ...income },
       funds,
     },
   };
@@ -21,6 +23,10 @@ function makeBudget(funds = [BASE_FUND]) {
 
 function renderBudgetView(dataOverrides = {}) {
   const updateTrackingMap = vi.fn();
+  const addBudgetIncomeRow = vi.fn();
+  const removeBudgetIncomeRow = vi.fn();
+  const renameBudgetIncomeRow = vi.fn();
+  const updateBudgetIncomeRow = vi.fn();
   const ctx = {
     data: {
       expenses: [],
@@ -42,13 +48,23 @@ function renderBudgetView(dataOverrides = {}) {
     importBudgetData: vi.fn(),
     showToast: vi.fn(),
     updateTrackingMap,
+    addBudgetIncomeRow,
+    removeBudgetIncomeRow,
+    renameBudgetIncomeRow,
+    updateBudgetIncomeRow,
   };
   render(
     <AppContext.Provider value={ctx}>
       <BudgetView />
     </AppContext.Provider>
   );
-  return { updateTrackingMap };
+  return {
+    updateTrackingMap,
+    addBudgetIncomeRow,
+    removeBudgetIncomeRow,
+    renameBudgetIncomeRow,
+    updateBudgetIncomeRow,
+  };
 }
 
 describe('BudgetView — category chip', () => {
@@ -111,6 +127,77 @@ describe('BudgetView — inline tracking panel', () => {
     renderBudgetView({ categories: [] });
     await user.click(screen.getByTitle('Kategorije troškova za ovaj fond'));
     expect(screen.getByText(/nema kategorija/i)).toBeInTheDocument();
+  });
+});
+
+describe('BudgetView — custom income rows', () => {
+  const HONORAR = { id: 'inc-1', name: 'Honorar', amounts: Array(12).fill(null) };
+  const withIncome = (rows) => ({ budget: makeBudget([BASE_FUND], { extra: rows }) });
+
+  test('a budget saved without income.extra still renders the income section', () => {
+    renderBudgetView();
+    expect(screen.getByText('Plata')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/dodaj prihod/i)).toBeInTheDocument();
+  });
+
+  test('renders a row for each custom income source', () => {
+    renderBudgetView(withIncome([HONORAR, { ...HONORAR, id: 'inc-2', name: 'Izdavanje' }]));
+    expect(screen.getByText('Honorar')).toBeInTheDocument();
+    expect(screen.getByText('Izdavanje')).toBeInTheDocument();
+  });
+
+  test('Enter in the add field creates the row and clears the input', async () => {
+    const user = userEvent.setup();
+    const { addBudgetIncomeRow } = renderBudgetView();
+    const input = screen.getByPlaceholderText(/dodaj prihod/i);
+    await user.type(input, 'Honorar{Enter}');
+    expect(addBudgetIncomeRow).toHaveBeenCalledWith(YEAR, 'Honorar');
+    expect(input).toHaveValue('');
+  });
+
+  test('a blank name adds nothing', async () => {
+    const user = userEvent.setup();
+    const { addBudgetIncomeRow } = renderBudgetView();
+    await user.type(screen.getByPlaceholderText(/dodaj prihod/i), '   {Enter}');
+    expect(addBudgetIncomeRow).not.toHaveBeenCalled();
+  });
+
+  test('the delete button is named after its row and deletes on the first click', async () => {
+    const user = userEvent.setup();
+    const { removeBudgetIncomeRow } = renderBudgetView(withIncome([HONORAR]));
+    await user.click(screen.getByRole('button', { name: 'Obriši prihod: Honorar' }));
+    expect(removeBudgetIncomeRow).toHaveBeenCalledWith(YEAR, 'inc-1');
+  });
+
+  test('double-clicking the name opens a rename input, Enter saves', async () => {
+    const user = userEvent.setup();
+    const { renameBudgetIncomeRow } = renderBudgetView(withIncome([HONORAR]));
+    await user.dblClick(screen.getByText('Honorar'));
+    const input = screen.getByDisplayValue('Honorar');
+    await user.clear(input);
+    await user.type(input, 'Freelance{Enter}');
+    expect(renameBudgetIncomeRow).toHaveBeenCalledWith(YEAR, 'inc-1', 'Freelance');
+  });
+
+  test('editing a month cell saves against that row', async () => {
+    const user = userEvent.setup();
+    const { updateBudgetIncomeRow } = renderBudgetView(withIncome([HONORAR]));
+    await user.click(document.querySelector('.bg__row--income .bgc'));
+    await user.type(document.querySelector('.bgc-input'), '5000{Enter}');
+    expect(updateBudgetIncomeRow).toHaveBeenCalledWith(YEAR, 'inc-1', 0, 5000);
+  });
+
+  test('custom income counts toward the monthly and yearly income totals', () => {
+    const plata = Array(12).fill(null);
+    plata[0] = 1000;
+    const amounts = Array(12).fill(null);
+    amounts[0] = 500;
+    renderBudgetView({
+      budget: makeBudget([BASE_FUND], { plata, extra: [{ ...HONORAR, amounts }] }),
+    });
+    const total = (1500).toLocaleString('sr-RS');
+    // The January subtotal cell and the year total on the subtotal row.
+    expect(screen.getAllByText(total).length).toBeGreaterThanOrEqual(2);
   });
 });
 
